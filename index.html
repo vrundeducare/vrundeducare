@@ -1,0 +1,7602 @@
+<!DOCTYPE html>
+<html lang="gu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>શાળા પરિણામ પોર્ટલ</title>
+
+<!-- મોબાઈલ Chrome માં Firebase Login અટકી ન જાય તે માટે (Firebase ને ડેસ્કટોપ બ્રાઉઝર તરીકે ઓળખાવે) -->
+<script>
+try{
+  if(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)){
+    Object.defineProperty(navigator,"userAgent",{
+      get:function(){ return "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"; },
+      configurable:true
+    });
+  }
+}catch(e){}
+</script>
+
+<!-- ================= FIREBASE ================= -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<!-- ================= XLSX ================= -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<!-- ================= EXCELJS ================= -->
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+
+<style>
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    font-family:Arial,"Noto Sans Gujarati",sans-serif;
+    background:linear-gradient(135deg,#171b4d,#35135e,#5b146b);
+    min-height:100vh;
+    color:#222;
+}
+
+button,
+input,
+select{
+    font-family:inherit;
+}
+
+.hidden{
+    display:none!important;
+}
+
+/* ================= LOADING ================= */
+
+#loading{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.68);
+    z-index:99999;
+    display:none;
+    align-items:center;
+    justify-content:center;
+}
+
+.loading-box{
+    background:white;
+    padding:30px 35px;
+    border-radius:20px;
+    text-align:center;
+    font-size:18px;
+    font-weight:bold;
+}
+
+/* ================= LOGIN ================= */
+
+#loginScreen{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+}
+
+.login-box{
+    width:100%;
+    max-width:520px;
+    background:white;
+    border-radius:28px;
+    padding:30px 25px;
+    box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+
+.login-title{
+    text-align:center;
+    color:#18245d;
+    font-size:30px;
+    font-weight:bold;
+    margin-bottom:5px;
+}
+
+.login-sub{
+    text-align:center;
+    color:#666;
+    font-size:20px;
+    margin-bottom:25px;
+}
+
+label{
+    display:block;
+    font-weight:bold;
+    margin:12px 0 7px;
+}
+
+input,
+select{
+    width:100%;
+    padding:14px;
+    border:1px solid #bbb;
+    border-radius:12px;
+    font-size:17px;
+    background:white;
+}
+
+.primary-btn,
+.green-btn,
+.gray-btn,
+.red-btn{
+    width:100%;
+    border:none;
+    padding:14px;
+    border-radius:13px;
+    font-size:18px;
+    font-weight:bold;
+    cursor:pointer;
+    margin-top:10px;
+}
+
+.primary-btn{
+    background:#27357d;
+    color:white;
+}
+
+.green-btn{
+    background:#11651f;
+    color:white;
+}
+
+.gray-btn{
+    background:#e4e4e4;
+    color:#222;
+}
+
+.red-btn{
+    background:#b52222;
+    color:white;
+}
+
+.status{
+    text-align:center;
+    margin-top:15px;
+    font-weight:bold;
+    color:#b51d1d;
+}
+
+/* ================= APP ================= */
+
+#app{
+    display:none;
+}
+
+.header{
+    background:linear-gradient(135deg,#1b2670,#4b1973);
+    color:white;
+    padding:18px;
+    position:sticky;
+    top:0;
+    z-index:1000;
+    box-shadow:0 4px 15px rgba(0,0,0,.25);
+}
+
+.header-title{
+    text-align:center;
+    font-size:25px;
+    font-weight:bold;
+}
+
+.header-school{
+    text-align:center;
+    margin-top:5px;
+    font-size:15px;
+}
+
+.nav{
+    display:flex;
+    overflow-x:auto;
+    gap:8px;
+    padding:10px 0 0;
+}
+
+.nav button{
+    flex:0 0 auto;
+    background:rgba(255,255,255,.15);
+    color:white;
+    border:1px solid rgba(255,255,255,.25);
+    padding:10px 14px;
+    border-radius:20px;
+    font-size:14px;
+    cursor:pointer;
+}
+
+.container{
+    max-width:1100px;
+    margin:auto;
+    padding:20px 15px 60px;
+}
+
+.page{
+    display:none;
+}
+
+.page.active{
+    display:block;
+}
+
+.card{
+    background:white;
+    border-radius:20px;
+    padding:20px;
+    margin-bottom:18px;
+    box-shadow:0 8px 25px rgba(0,0,0,.15);
+}
+
+.card h2{
+    margin-top:0;
+    color:#202d71;
+}
+
+.info-box{
+    background:#f1f4ff;
+    border-radius:15px;
+    padding:15px;
+    margin-bottom:18px;
+    line-height:1.8;
+}
+
+/* ================= MENU ================= */
+
+.menu-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:15px;
+}
+
+.menu-card{
+    background:white;
+    border-radius:20px;
+    min-height:120px;
+    padding:20px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    box-shadow:0 8px 25px rgba(0,0,0,.16);
+    cursor:pointer;
+    transition:.2s;
+}
+
+.menu-card:active{
+    transform:scale(.97);
+}
+
+.menu-icon{
+    font-size:38px;
+    margin-bottom:10px;
+}
+
+.menu-title{
+    font-weight:bold;
+    color:#202d71;
+    font-size:17px;
+}
+
+/* ================= FORMS ================= */
+
+.form-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:15px;
+}
+
+.full{
+    grid-column:1/-1;
+}
+
+.save-btn{
+    background:#263b89;
+    color:white;
+    border:0;
+    border-radius:12px;
+    padding:14px 25px;
+    font-size:17px;
+    font-weight:bold;
+    margin-top:15px;
+    cursor:pointer;
+}
+
+/* ================= STUDENTS ================= */
+
+.student-actions{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:10px;
+    margin-bottom:15px;
+}
+
+.action-btn{
+    border:0;
+    padding:13px;
+    border-radius:12px;
+    font-weight:bold;
+    font-size:15px;
+    cursor:pointer;
+}
+
+.add{
+    background:#253b8b;
+    color:white;
+}
+
+.excel{
+    background:#147a35;
+    color:white;
+}
+
+.import{
+    background:#7340a8;
+    color:white;
+}
+
+.logout{
+    background:#a51e25;
+    color:white;
+}
+
+.table-wrap{
+    width:100%;
+    overflow-x:auto;
+    background:white;
+    border-radius:15px;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:850px;
+}
+
+th,
+td{
+    border:1px solid #ccc;
+    padding:9px;
+    text-align:center;
+}
+
+th{
+    background:#222d6d;
+    color:white;
+    white-space:nowrap;
+}
+
+td input,
+td select{
+    padding:8px;
+    font-size:14px;
+    min-width:120px;
+}
+
+.delete-btn{
+    background:#c62828;
+    color:white;
+    border:0;
+    border-radius:7px;
+    padding:7px 10px;
+    cursor:pointer;
+}
+
+/* ================= SEMESTER ================= */
+
+.sem-title{
+    background:white;
+    border-radius:20px;
+    padding:20px;
+    margin-bottom:18px;
+    text-align:center;
+    box-shadow:0 8px 25px rgba(0,0,0,.15);
+}
+
+.back-btn{
+    background:#333;
+    color:white;
+    border:0;
+    padding:11px 18px;
+    border-radius:10px;
+    margin-bottom:15px;
+    cursor:pointer;
+}
+
+/* ================= MOBILE ================= */
+
+@media(max-width:650px){
+
+    .login-title{
+        font-size:25px;
+    }
+
+    .menu-grid{
+        grid-template-columns:1fr 1fr;
+        gap:10px;
+    }
+
+    .menu-card{
+        min-height:105px;
+        padding:12px;
+    }
+
+    .menu-icon{
+        font-size:30px;
+    }
+
+    .menu-title{
+        font-size:14px;
+    }
+
+    .form-grid{
+        grid-template-columns:1fr;
+    }
+
+    .full{
+        grid-column:auto;
+    }
+
+    .student-actions{
+        grid-template-columns:1fr 1fr;
+    }
+}
+
+/* ================= TRIMASIK KASOTI ================= */
+
+.tri-table{min-width:0;width:auto}
+.tri-table th,.tri-table td{padding:6px}
+.tri-table td input{min-width:60px;width:70px;padding:7px;text-align:center}
+.tri-name{min-width:170px;text-align:left}
+.tri-maxrow td{background:#fff6d6;font-weight:bold}
+.tri-total{font-weight:bold;background:#eef2ff}
+
+/* ================= SWA ADHYAYAN ================= */
+
+.swa-table input{min-width:80px;width:90px}
+
+/* ================= EXPORT BAR ================= */
+
+.export-bar{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:10px;
+    margin-top:12px;
+}
+
+.pdf{
+    background:#b52222;
+    color:white;
+}
+
+.print{
+    background:#444;
+    color:white;
+}
+
+/* ================= PATRAK-C ================= */
+
+.pc th{white-space:normal;font-size:12px;line-height:1.2;padding:2px;vertical-align:middle}
+.pc td{padding:5px 3px;font-size:13px}
+.pc td.l{text-align:left}
+.pc td input{min-width:0;width:100%;padding:5px 2px;text-align:center;font-size:13px}
+.pc tr.mx td{background:#fff6d6;font-weight:bold}
+.pc td.tt{background:#fff8c6;font-weight:bold}
+.pc td.gg{font-weight:bold}
+
+/* ================= PATRAK-B ================= */
+
+.pb-table{min-width:0;width:auto}
+.pb-table th,.pb-table td{padding:4px 3px;font-size:12px}
+.pb-table th{white-space:normal;background:#f7c62f;color:#222}
+.pb-table .rot{writing-mode:vertical-rl;transform:rotate(180deg);height:200px;font-size:11px;line-height:1.25;margin:0 auto;text-align:left;white-space:normal}
+.pb-table td input{width:36px;min-width:0;padding:5px 1px;text-align:center;font-size:13px}
+.pb-table td input.pb-tot{width:62px;border:2px dashed #7a8cff;background:#eef1ff;font-weight:bold}
+.pb-table td.sem{background:#ede7ff;font-weight:bold;white-space:nowrap;color:#3b2a8c}
+.pb-table td.tt{background:#fff8c6;font-weight:bold}
+.pb-table input:disabled{background:#e9e9e9;color:#555}
+</style>
+</head>
+
+<body>
+
+<!-- ================= LOADING ================= -->
+
+<div id="loading">
+    <div class="loading-box">
+        કૃપા કરીને રાહ જુઓ...
+    </div>
+</div>
+
+<!-- ================= LOGIN ================= -->
+
+<section id="loginScreen">
+
+<div class="login-box">
+
+    <div class="login-title">
+        શાળા પરિણામ પોર્ટલ
+    </div>
+
+    <div class="login-sub">
+        Register / Login
+    </div>
+
+    <label>ઇ-મેઇલ</label>
+
+    <input
+        id="email"
+        type="email"
+        placeholder="તમારો ઇ-મેઇલ"
+    >
+
+    <label>પાસવર્ડ</label>
+
+    <input
+        id="password"
+        type="password"
+        placeholder="પાસવર્ડ"
+    >
+
+    <button
+        class="primary-btn"
+        onclick="loginUser()">
+        Login
+    </button>
+
+    <button
+        class="green-btn"
+        onclick="registerUser()">
+        Register
+    </button>
+
+    <button
+        class="gray-btn"
+        onclick="resetPassword()">
+        Password ભૂલી ગયા?
+    </button>
+
+    <div
+        id="loginStatus"
+        class="status">
+    </div>
+
+</div>
+
+</section>
+
+
+<!-- ================= APP ================= -->
+
+<div id="app">
+
+<header class="header">
+
+    <div class="header-title">
+        શાળા પરિણામ પોર્ટલ
+    </div>
+
+    <div
+        class="header-school"
+        id="headerInfo">
+        ધોરણ અને વર્ગ પસંદ કરો
+    </div>
+
+    <div class="nav">
+
+        <button onclick="showPage('home')">
+            મુખ્ય પેજ
+        </button>
+
+        <button onclick="showPage('school')">
+            શાળાની વિગત
+        </button>
+
+        <button onclick="showPage('classInfo')">
+            વર્ગની વિગત
+        </button>
+
+        <button onclick="showPage('students')">
+            વિદ્યાર્થી
+        </button>
+
+        <button onclick="showPage('sem1')">
+            સેમેસ્ટર-1
+        </button>
+
+        <button onclick="showPage('sem2')">
+            સેમેસ્ટર-2
+        </button>
+
+        <button onclick="logoutUser()">
+            Logout
+        </button>
+
+    </div>
+
+</header>
+
+
+<div class="container">
+
+
+<!-- ================= HOME ================= -->
+
+<section id="home" class="page active">
+
+<div class="card">
+
+    <h2>
+        🎓 ધોરણ અને વર્ગ પસંદ કરો
+    </h2>
+
+    <div class="form-grid">
+
+        <div>
+
+            <label>
+                ધોરણ
+            </label>
+
+            <select
+                id="standardSelect"
+                onchange="changeClassInfo()">
+
+                <option value="">
+                    -- ધોરણ પસંદ કરો --
+                </option>
+
+                <option value="3">
+                    ધોરણ 3
+                </option>
+
+                <option value="4">
+                    ધોરણ 4
+                </option>
+
+                <option value="5">
+                    ધોરણ 5
+                </option>
+
+                <option value="6">
+                    ધોરણ 6
+                </option>
+
+                <option value="7">
+                    ધોરણ 7
+                </option>
+
+                <option value="8">
+                    ધોરણ 8
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <div>
+
+            <label>
+                વર્ગ
+            </label>
+
+            <select id="divisionSelect">
+
+                <option value="">
+                    -- વર્ગ પસંદ કરો --
+                </option>
+
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+                <option value="E">E</option>
+                <option value="F">F</option>
+
+            </select>
+
+        </div>
+
+    </div>
+
+
+    <button
+        class="primary-btn"
+        onclick="openSelectedClass()">
+
+        વર્ગ શરૂ કરો
+
+    </button>
+
+</div>
+
+
+<div class="info-box">
+
+    <b>હાલનું ધોરણ:</b>
+
+    <span id="currentStandardText">
+        પસંદ કરેલ નથી
+    </span>
+
+    <br>
+
+    <b>હાલનો વર્ગ:</b>
+
+    <span id="currentDivisionText">
+        પસંદ કરેલ નથી
+    </span>
+
+    <br>
+
+    <b>શૈક્ષણિક વર્ષ:</b>
+
+    <span id="homeYearText">
+        પસંદ કરેલ નથી
+    </span>
+
+</div>
+
+</section>
+
+
+<!-- ================= SCHOOL ================= -->
+
+<section id="school" class="page">
+
+<div class="card">
+
+    <h2>
+        🏫 શાળાની વિગત
+    </h2>
+
+    <div class="form-grid">
+
+        <div class="full">
+
+            <label>
+                શાળાનો લોગો (PNG / JPEG)
+            </label>
+
+            <input
+                id="logoFile"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onchange="onLogoSelect(event)">
+
+            <div id="logoPreviewBox" style="margin-top:8px"></div>
+
+        </div>
+
+
+        <div class="full">
+
+            <label>
+                સંસ્થાનું નામ <span style="color:#d00;font-size:20px">*</span>
+            </label>
+
+            <input
+                id="institutionName"
+                placeholder="સંસ્થાનું નામ"
+                oninput="this.style.borderColor=''">
+
+        </div>
+
+
+        <div class="full">
+
+            <label>
+                શાળાનું નામ <span style="color:#d00;font-size:20px">*</span>
+            </label>
+
+            <input
+                id="schoolName"
+                placeholder="શાળાનું નામ"
+                oninput="this.style.borderColor=''">
+
+        </div>
+
+
+        <div>
+
+            <label>
+                શાળા કોડ
+            </label>
+
+            <input
+                id="schoolCode"
+                placeholder="શાળા કોડ">
+
+        </div>
+
+
+        <div>
+
+            <label>
+                શૈક્ષણિક વર્ષ
+            </label>
+
+            <select id="academicYear">
+
+                <option value="">
+                    -- વર્ષ પસંદ કરો --
+                </option>
+
+                <option value="2026-27">
+                    2026-27
+                </option>
+
+                <option value="2027-28">
+                    2027-28
+                </option>
+
+                <option value="2028-29">
+                    2028-29
+                </option>
+
+                <option value="2029-30">
+                    2029-30
+                </option>
+
+                <option value="2030-31">
+                    2030-31
+                </option>
+
+                <option value="2031-32">
+                    2031-32
+                </option>
+
+                <option value="2032-33">
+                    2032-33
+                </option>
+
+                <option value="2033-34">
+                    2033-34
+                </option>
+
+                <option value="2034-35">
+                    2034-35
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <div class="full">
+
+            <label>
+                સરનામું
+            </label>
+
+            <input
+                id="schoolAddress"
+                placeholder="શાળાનું સરનામું">
+
+        </div>
+
+
+        
+
+
+        
+
+
+        <div>
+            <label>સેમેસ્ટર-1 પરિણામની તારીખ</label>
+            <input id="sem1ResultDate" type="date">
+        </div>
+
+
+        <div>
+            <label>સેમેસ્ટર-2 પરિણામની તારીખ</label>
+            <input id="sem2ResultDate" type="date">
+        </div>
+
+
+        <div>
+            <label>દિવાળી વેકેશન તારીખ (થી)</label>
+            <input id="diwaliFrom" type="date">
+        </div>
+
+
+        <div>
+            <label>દિવાળી વેકેશન તારીખ (સુધી)</label>
+            <input id="diwaliTo" type="date">
+        </div>
+
+
+        <div>
+            <label>ઉનાળુ વેકેશન તારીખ (થી)</label>
+            <input id="summerFrom" type="date">
+        </div>
+
+
+        <div>
+            <label>ઉનાળુ વેકેશન તારીખ (સુધી)</label>
+            <input id="summerTo" type="date">
+        </div>
+
+    </div>
+
+
+    <button
+        class="save-btn"
+        onclick="saveSchoolInfo()">
+
+        💾 શાળાની વિગત સાચવો
+
+    </button>
+
+
+    <div
+        id="schoolStatus"
+        class="status">
+    </div>
+
+</div>
+
+</section>
+
+
+<!-- ================= CLASS INFO ================= -->
+
+<section id="classInfo" class="page">
+
+<div class="card">
+
+    <h2>
+        📚 વર્ગની વિગત
+    </h2>
+
+    <div class="info-box">
+
+        <b>ધોરણ:</b>
+
+        <span id="classStandardText">
+            -
+        </span>
+
+        <br>
+
+        <b>વર્ગ:</b>
+
+        <span id="classDivisionText">
+            -
+        </span>
+
+        <br>
+
+        <b>શૈક્ષણિક વર્ષ:</b>
+
+        <span id="classYearText">
+            -
+        </span>
+
+    </div>
+
+
+    <div class="menu-grid">
+
+        <div
+            class="menu-card"
+            onclick="showPage('students')">
+
+            <div class="menu-icon">
+                👨‍🎓
+            </div>
+
+            <div class="menu-title">
+                વિદ્યાર્થી ઉમેરો
+            </div>
+
+        </div>
+
+
+        <div
+            class="menu-card"
+            onclick="showPage('school')">
+
+            <div class="menu-icon">
+                🏫
+            </div>
+
+            <div class="menu-title">
+                શાળાની વિગત
+            </div>
+
+        </div>
+
+
+        <div
+            class="menu-card"
+            onclick="showPage('sem1')">
+
+            <div class="menu-icon">
+                1️⃣
+            </div>
+
+            <div class="menu-title">
+                સેમેસ્ટર-1
+            </div>
+
+        </div>
+
+
+        <div
+            class="menu-card"
+            onclick="showPage('sem2')">
+
+            <div class="menu-icon">
+                2️⃣
+            </div>
+
+            <div class="menu-title">
+                સેમેસ્ટર-2
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+</section>
+
+
+<!-- ================= STUDENTS ================= -->
+
+<section id="students" class="page">
+
+<div class="card">
+
+    <h2>
+        👨‍🎓 વિદ્યાર્થી ઉમેરો
+    </h2>
+
+
+    <div class="info-box">
+
+        <b>ધોરણ:</b>
+
+        <span id="studentStandardText">
+            -
+        </span>
+
+        &nbsp;&nbsp;
+
+        <b>વર્ગ:</b>
+
+        <span id="studentDivisionText">
+            -
+        </span>
+
+        <br>
+
+        <b>શૈક્ષણિક વર્ષ:</b>
+
+        <span id="studentYearText">
+            -
+        </span>
+
+    </div>
+
+
+    <div class="student-actions">
+
+        <button
+            class="action-btn add"
+            onclick="addStudentRow()">
+
+            ➕ વિદ્યાર્થી ઉમેરો
+
+        </button>
+
+
+        <button
+            class="action-btn excel"
+            onclick="downloadTemplate()">
+
+            📥 Excel Template
+
+        </button>
+
+
+        <button
+            class="action-btn import"
+            onclick="document.getElementById('excelFile').click()">
+
+            📤 Excel Import
+
+        </button>
+
+
+        <button
+            class="action-btn excel"
+            onclick="exportExcel()">
+
+            📊 Excel Export
+
+        </button>
+
+    </div>
+
+
+    <input
+        id="excelFile"
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        style="display:none"
+        onchange="importExcel(event)">
+
+
+    <div class="table-wrap">
+
+    <table>
+
+        <thead>
+
+            <tr>
+
+                <th>
+                    ક્રમ
+                </th>
+
+                <th>
+                    વિદ્યાર્થીનું નામ
+                </th>
+
+                <th>
+                    વ.પ.નં.
+                </th>
+
+                <th>
+                    જન્મ તારીખ
+                </th>
+
+                <th>
+                    કેટેગરી
+                </th>
+
+                <th>
+                    કુમાર/કન્યા
+                </th>
+
+                <th>
+                    કાઢો
+                </th>
+
+            </tr>
+
+        </thead>
+
+        <tbody id="studentTableBody">
+        </tbody>
+
+    </table>
+
+    </div>
+
+
+    <button
+        class="save-btn"
+        onclick="saveStudents()">
+
+        💾 બધા વિદ્યાર્થી સાચવો
+
+    </button>
+
+
+    <div
+        id="studentStatus"
+        class="status">
+    </div>
+
+</div>
+
+</section>
+
+
+<!-- ================= SEMESTER 1 ================= -->
+
+<section id="sem1" class="page">
+
+<div class="sem-title">
+
+    <h2>
+        📘 સેમેસ્ટર-1
+    </h2>
+
+</div>
+
+
+<div class="menu-grid">
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem1-att')">
+
+        <div class="menu-icon">🗓️</div>
+
+        <div class="menu-title">
+            હાજરી
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem1-trimasik')">
+
+        <div class="menu-icon">📝</div>
+
+        <div class="menu-title">
+            ત્રિમાસિક કસોટી
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem1-satrant')">
+
+        <div class="menu-icon">📋</div>
+
+        <div class="menu-title">
+            સત્રાંત કસોટી
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem1-swa')">
+
+        <div class="menu-icon">📚</div>
+
+        <div class="menu-title">
+            સ્વ અધ્યયન
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem1-a')">
+
+        <div class="menu-icon">📄</div>
+
+        <div class="menu-title">
+            પત્રક-A
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem1-b')">
+
+        <div class="menu-icon">📄</div>
+
+        <div class="menu-title">
+            પત્રક-B
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem1-c')">
+
+        <div class="menu-icon">📄</div>
+
+        <div class="menu-title">
+            પત્રક-C
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem1-f')">
+
+        <div class="menu-icon">📄</div>
+
+        <div class="menu-title">
+            પત્રક-F
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem1-top10')">
+
+        <div class="menu-icon">🏆</div>
+
+        <div class="menu-title">
+            Top 10
+        </div>
+
+    </div>
+
+</div>
+
+</section>
+
+
+<!-- ================= SEMESTER 2 ================= -->
+
+<section id="sem2" class="page">
+
+<div class="sem-title">
+
+    <h2>
+        📗 સેમેસ્ટર-2
+    </h2>
+
+</div>
+
+
+<div class="menu-grid">
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem2-att')">
+
+        <div class="menu-icon">🗓️</div>
+
+        <div class="menu-title">
+            હાજરી
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem2-trimasik')">
+
+        <div class="menu-icon">📝</div>
+
+        <div class="menu-title">
+            ત્રિમાસિક કસોટી
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem2-satrant')">
+
+        <div class="menu-icon">📋</div>
+
+        <div class="menu-title">
+            સત્રાંત કસોટી
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem2-swa')">
+
+        <div class="menu-icon">📚</div>
+
+        <div class="menu-title">
+            સ્વ અધ્યયન
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem2-a')">
+
+        <div class="menu-icon">📄</div>
+
+        <div class="menu-title">
+            પત્રક-A
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem2-b')">
+
+        <div class="menu-icon">📄</div>
+
+        <div class="menu-title">
+            પત્રક-B
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem2-c')">
+
+        <div class="menu-icon">📄</div>
+
+        <div class="menu-title">
+            પત્રક-C
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem2-f')">
+
+        <div class="menu-icon">📄</div>
+
+        <div class="menu-title">
+            પત્રક-F
+        </div>
+
+    </div>
+
+
+    <div
+        class="menu-card"
+        onclick="showPage('sem2-top10')">
+
+        <div class="menu-icon">🏆</div>
+
+        <div class="menu-title">
+            Top 10
+        </div>
+
+    </div>
+
+</div>
+
+</section>
+
+
+<!-- ================= ATTENDANCE PAGES ================= -->
+
+<section id="sem1-att" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem1')">← સેમેસ્ટર-1</button>
+<h2>🗓️ સેમેસ્ટર-1 હાજરી</h2>
+<div id="att-sem1"></div>
+</div>
+</section>
+
+
+<section id="sem2-att" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem2')">← સેમેસ્ટર-2</button>
+<h2>🗓️ સેમેસ્ટર-2 હાજરી</h2>
+<div id="att-sem2"></div>
+</div>
+</section>
+
+
+<!-- ================= SEM 1 SUB PAGES ================= -->
+
+<section id="sem1-trimasik" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem1')">← સેમેસ્ટર-1</button>
+<h2>📝 સેમેસ્ટર-1 ત્રિમાસિક કસોટી</h2>
+<div id="tri-sem1"></div>
+</div>
+</section>
+
+
+<section id="sem1-satrant" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem1')">← સેમેસ્ટર-1</button>
+<h2>📋 સેમેસ્ટર-1 સત્રાંત કસોટી</h2>
+<div id="sat-sem1"></div>
+</div>
+</section>
+
+
+<section id="sem1-swa" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem1')">← સેમેસ્ટર-1</button>
+<h2>📚 સેમેસ્ટર-1 સ્વ અધ્યયન</h2>
+<div id="swa-sem1"></div>
+</div>
+</section>
+
+
+<section id="sem1-a" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem1')">← સેમેસ્ટર-1</button>
+<h2>📄 સેમેસ્ટર-1 પત્રક-A</h2>
+<p>આ વિભાગનું પત્રક આગળ તૈયાર કરવામાં આવશે.</p>
+</div>
+</section>
+
+
+<section id="sem1-b" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem1')">← સેમેસ્ટર-1</button>
+<h2>📄 સેમેસ્ટર-1 પત્રક-B</h2>
+<div id="pb-sem1"></div>
+</div>
+</section>
+
+
+<section id="sem1-c" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem1')">← સેમેસ્ટર-1</button>
+<h2>📄 સેમેસ્ટર-1 પત્રક-C</h2>
+<div id="pc-sem1"></div>
+</div>
+</section>
+
+
+<section id="sem1-f" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem1')">← સેમેસ્ટર-1</button>
+<h2>📄 સેમેસ્ટર-1 પત્રક-F</h2>
+<div id="pf-sem1"></div>
+</div>
+</section>
+
+
+<section id="sem1-top10" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem1')">← સેમેસ્ટર-1</button>
+<h2>🏆 સેમેસ્ટર-1 Top 10</h2>
+<p>Top 10 પરિણામ આગળ આપમેળે તૈયાર કરવામાં આવશે.</p>
+</div>
+</section>
+
+
+<!-- ================= SEM 2 SUB PAGES ================= -->
+
+<section id="sem2-trimasik" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem2')">← સેમેસ્ટર-2</button>
+<h2>📝 સેમેસ્ટર-2 ત્રિમાસિક કસોટી</h2>
+<div id="tri-sem2"></div>
+</div>
+</section>
+
+
+<section id="sem2-satrant" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem2')">← સેમેસ્ટર-2</button>
+<h2>📋 સેમેસ્ટર-2 સત્રાંત કસોટી</h2>
+<div id="sat-sem2"></div>
+</div>
+</section>
+
+
+<section id="sem2-swa" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem2')">← સેમેસ્ટર-2</button>
+<h2>📚 સેમેસ્ટર-2 સ્વ અધ્યયન</h2>
+<div id="swa-sem2"></div>
+</div>
+</section>
+
+
+<section id="sem2-a" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem2')">← સેમેસ્ટર-2</button>
+<h2>📄 સેમેસ્ટર-2 પત્રક-A</h2>
+<p>આ વિભાગનું પત્રક આગળ તૈયાર કરવામાં આવશે.</p>
+</div>
+</section>
+
+
+<section id="sem2-b" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem2')">← સેમેસ્ટર-2</button>
+<h2>📄 સેમેસ્ટર-2 પત્રક-B</h2>
+<div id="pb-sem2"></div>
+</div>
+</section>
+
+
+<section id="sem2-c" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem2')">← સેમેસ્ટર-2</button>
+<h2>📄 સેમેસ્ટર-2 પત્રક-C</h2>
+<div id="pc-sem2"></div>
+</div>
+</section>
+
+
+<section id="sem2-f" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem2')">← સેમેસ્ટર-2</button>
+<h2>📄 સેમેસ્ટર-2 પત્રક-F</h2>
+<div id="pf-sem2"></div>
+</div>
+</section>
+
+
+<section id="sem2-top10" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem2')">← સેમેસ્ટર-2</button>
+<h2>🏆 સેમેસ્ટર-2 Top 10</h2>
+<p>Top 10 પરિણામ આગળ આપમેળે તૈયાર કરવામાં આવશે.</p>
+</div>
+</section>
+
+
+</div>
+</div>
+
+
+<script>
+
+/* =========================================================
+   ERROR DISPLAY (સમસ્યા હોય તો Login સ્ક્રીન પર દેખાશે)
+========================================================= */
+
+function showFatal(msg){
+    const st = document.getElementById("loginStatus");
+    if(st){
+        st.style.color = "red";
+        st.innerText = msg;
+    }
+    showLoading(false);
+}
+
+window.addEventListener("error", function(e){
+    // બહારની Library (Firebase વગેરે) ની વિગત વગરની "Script error." બતાવવી નથી
+    if(!e.message || e.message === "Script error." || !e.filename){
+        console.log("External script error (ignored):", e.message);
+        return;
+    }
+    showFatal("ભૂલ: " + e.message);
+});
+
+window.addEventListener("unhandledrejection", function(e){
+    console.log("Unhandled rejection:", e.reason);
+});
+
+if(typeof firebase === "undefined"){
+    throw new Error("Firebase લોડ થયું નથી. Internet તપાસો અને પેજ ફરી ખોલો.");
+}
+
+
+/* =========================================================
+   FIREBASE CONFIG
+========================================================= */
+
+const firebaseConfig = {
+
+    apiKey:
+    "AIzaSyA6K10YT4i9xzzXprwGvqnGOe8wk5fZLg8",
+
+    authDomain:
+    "vrundeducare-fc779.firebaseapp.com",
+
+    projectId:
+    "vrundeducare-fc779",
+
+    storageBucket:
+    "vrundeducare-fc779.firebasestorage.app",
+
+    messagingSenderId:
+    "846321311058",
+
+    appId:
+    "1:846321311058:web:d7e4e813ebe6d581dfae8b",
+
+    measurementId:
+    "G-9M4MK7EBTF"
+};
+
+
+firebase.initializeApp(firebaseConfig);
+
+const auth = firebase.auth();
+
+const db = firebase.firestore();
+
+
+/* =========================================================
+   VARIABLES
+========================================================= */
+
+/* Browser storage (પ્રકાશિત પેજમાં ખાલી પણ હોઈ શકે) */
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+
+let currentUser = null;
+
+let selectedStandard = "";
+
+let selectedDivision = "";
+
+let students = [];
+
+let schoolExtra = {
+    institution:"", logo:"",
+    sem1ResultDate:"", sem2ResultDate:"",
+    diwaliFrom:"", diwaliTo:"", summerFrom:"", summerTo:""
+};
+
+
+/* =========================================================
+   LOADING
+========================================================= */
+
+function showLoading(show){
+
+    document.getElementById("loading").style.display =
+        show ? "flex" : "none";
+
+}
+
+
+function withTimeout(p,ms){
+    return new Promise(function(resolve,reject){
+        const t = setTimeout(function(){ reject({code:"timeout"}); },ms);
+        p.then(function(v){ clearTimeout(t); resolve(v); },
+               function(e){ clearTimeout(t); reject(e); });
+    });
+}
+
+
+/* =========================================================
+   LOGIN
+========================================================= */
+
+async function loginUser(){
+
+    const email =
+        document.getElementById("email").value.trim();
+
+    const password =
+        document.getElementById("password").value;
+
+    const status =
+        document.getElementById("loginStatus");
+
+
+    status.style.color = "red";
+
+
+    if(!email || !password){
+
+        status.innerText =
+            "ઇ-મેઇલ અને પાસવર્ડ બંને નાખો.";
+
+        return;
+    }
+
+
+    showLoading(true);
+
+    status.innerText = "";
+
+
+    try{
+
+        await withTimeout(auth.signInWithEmailAndPassword(
+            email,
+            password
+        ),30000);
+
+    }catch(error){
+
+        showLoading(false);
+
+        status.innerText =
+            firebaseError(error);
+
+    }
+
+}
+
+
+/* =========================================================
+   REGISTER
+========================================================= */
+
+async function registerUser(){
+
+    const email =
+        document.getElementById("email").value.trim();
+
+    const password =
+        document.getElementById("password").value;
+
+    const status =
+        document.getElementById("loginStatus");
+
+
+    status.style.color = "red";
+
+
+    if(!email || !password){
+
+        status.innerText =
+            "ઇ-મેઇલ અને પાસવર્ડ નાખો.";
+
+        return;
+    }
+
+
+    if(password.length < 6){
+
+        status.innerText =
+            "પાસવર્ડ ઓછામાં ઓછો 6 અક્ષરનો હોવો જોઈએ.";
+
+        return;
+    }
+
+
+    showLoading(true);
+
+    status.innerText = "";
+
+
+    try{
+
+        await withTimeout(auth.createUserWithEmailAndPassword(
+            email,
+            password
+        ),30000);
+
+    }catch(error){
+
+        showLoading(false);
+
+        status.innerText =
+            firebaseError(error);
+
+    }
+
+}
+
+
+/* =========================================================
+   PASSWORD RESET
+========================================================= */
+
+async function resetPassword(){
+
+    const email =
+        document.getElementById("email").value.trim();
+
+    const status =
+        document.getElementById("loginStatus");
+
+
+    if(!email){
+
+        status.innerText =
+            "પહેલા ઇ-મેઇલ લખો.";
+
+        return;
+    }
+
+
+    try{
+
+        showLoading(true);
+
+        await auth.sendPasswordResetEmail(email);
+
+        status.style.color = "green";
+
+        status.innerText =
+            "Password reset link ઇ-મેઇલ પર મોકલવામાં આવી છે.";
+
+    }catch(error){
+
+        status.style.color = "red";
+
+        status.innerText =
+            firebaseError(error);
+
+    }finally{
+
+        showLoading(false);
+
+    }
+
+}
+
+
+/* =========================================================
+   AUTH STATE
+========================================================= */
+
+auth.onAuthStateChanged(async function(user){
+
+    if(user){
+
+        currentUser = user;
+
+        document.getElementById("loginScreen")
+            .style.display = "none";
+
+        document.getElementById("app")
+            .style.display = "block";
+
+
+        showLoading(false);
+
+
+        await loadSchoolInfo();
+
+        await loadStudents();
+
+    }else{
+
+        currentUser = null;
+
+        document.getElementById("loginScreen")
+            .style.display = "flex";
+
+        document.getElementById("app")
+            .style.display = "none";
+
+        showLoading(false);
+
+    }
+
+});
+
+
+/* =========================================================
+   LOGOUT
+========================================================= */
+
+async function logoutUser(){
+
+    await auth.signOut();
+
+}
+
+
+/* =========================================================
+   NAVIGATION
+========================================================= */
+
+function showPage(pageId){
+
+    const pages =
+        document.querySelectorAll(".page");
+
+
+    pages.forEach(function(page){
+
+        page.classList.remove("active");
+
+    });
+
+
+    const target =
+        document.getElementById(pageId);
+
+
+    if(target){
+
+        target.classList.add("active");
+
+    }
+
+
+    if(pageId==="sem1-trimasik") renderExamForm("tri",1);
+    if(pageId==="sem2-trimasik") renderExamForm("tri",2);
+    if(pageId==="sem1-satrant") renderExamForm("sat",1);
+    if(pageId==="sem2-satrant") renderExamForm("sat",2);
+    if(pageId==="sem1-c") loadPatrakC(1);
+    if(pageId==="sem2-c") loadPatrakC(2);
+    if(pageId==="sem1-b") loadPatrakB(1);
+    if(pageId==="sem2-b") loadPatrakB(2);
+    if(pageId==="sem1-f") loadPatrakF(1);
+    if(pageId==="sem2-f") loadPatrakF(2);
+    if(pageId==="sem1-att") renderAttendance(1);
+    if(pageId==="sem2-att") renderAttendance(2);
+    if(pageId==="sem1-swa") renderSwaForm(1);
+    if(pageId==="sem2-swa") renderSwaForm(2);
+
+
+    window.scrollTo({
+
+        top:0,
+
+        behavior:"smooth"
+
+    });
+
+}
+
+
+/* =========================================================
+   STANDARD / DIVISION
+========================================================= */
+
+function changeClassInfo(){
+
+    const standard =
+        document.getElementById("standardSelect").value;
+
+
+    document.getElementById(
+        "currentStandardText"
+    ).innerText =
+        standard
+        ? "ધોરણ " + standard
+        : "પસંદ કરેલ નથી";
+
+}
+
+
+/* =========================================================
+   OPEN SELECTED CLASS
+========================================================= */
+
+async function openSelectedClass(){
+
+    const standard =
+        document.getElementById("standardSelect").value;
+
+    const division =
+        document.getElementById("divisionSelect").value;
+
+
+    if(!standard){
+
+        alert("પહેલા ધોરણ પસંદ કરો.");
+
+        return;
+
+    }
+
+
+    if(!division){
+
+        alert("પહેલા વર્ગ પસંદ કરો.");
+
+        return;
+
+    }
+
+
+    selectedStandard = standard;
+
+    selectedDivision = division;
+
+
+    lsSet(
+        "selectedStandard",
+        standard
+    );
+
+    lsSet(
+        "selectedDivision",
+        division
+    );
+
+
+    updateAllClassTexts();
+
+
+    await loadStudents();
+
+
+    showPage("classInfo");
+
+}
+
+
+/* =========================================================
+   UPDATE CLASS TEXT
+========================================================= */
+
+function updateAllClassTexts(){
+
+    const standardText =
+        selectedStandard
+        ? "ધોરણ " + selectedStandard
+        : "-";
+
+
+    const divisionText =
+        selectedDivision
+        ? selectedDivision
+        : "-";
+
+
+    document.getElementById(
+        "currentStandardText"
+    ).innerText = standardText;
+
+
+    document.getElementById(
+        "currentDivisionText"
+    ).innerText = divisionText;
+
+
+    document.getElementById(
+        "studentStandardText"
+    ).innerText = standardText;
+
+
+    document.getElementById(
+        "studentDivisionText"
+    ).innerText = divisionText;
+
+
+    document.getElementById(
+        "classStandardText"
+    ).innerText = standardText;
+
+
+    document.getElementById(
+        "classDivisionText"
+    ).innerText = divisionText;
+
+
+    const year =
+        document.getElementById("academicYear").value;
+
+
+    document.getElementById(
+        "classYearText"
+    ).innerText =
+        year || "-";
+
+
+    document.getElementById(
+        "studentYearText"
+    ).innerText =
+        year || "-";
+
+
+    document.getElementById(
+        "homeYearText"
+    ).innerText =
+        year || "પસંદ કરેલ નથી";
+
+
+    updateHeader();
+
+}
+
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+function updateHeader(){
+
+    let text =
+        "શાળા પરિણામ પોર્ટલ";
+
+
+    if(
+        selectedStandard &&
+        selectedDivision
+    ){
+
+        text +=
+            " | ધોરણ " +
+            selectedStandard +
+            " - વર્ગ " +
+            selectedDivision;
+
+    }
+
+
+    const year =
+        document.getElementById("academicYear").value;
+
+
+    if(year){
+
+        text +=
+            " | " + year;
+
+    }
+
+
+    document.getElementById(
+        "headerInfo"
+    ).innerText = text;
+
+}
+
+
+/* =========================================================
+   SCHOOL SAVE
+========================================================= */
+
+async function saveSchoolInfo(){
+
+    if(!currentUser){
+
+        alert("Login જરૂરી છે.");
+
+        return;
+
+    }
+
+
+    const data = {
+
+        schoolName:
+            document.getElementById(
+                "schoolName"
+            ).value.trim(),
+
+        schoolCode:
+            document.getElementById(
+                "schoolCode"
+            ).value.trim(),
+
+        academicYear:
+            document.getElementById(
+                "academicYear"
+            ).value,
+
+        address:
+            document.getElementById(
+                "schoolAddress"
+            ).value.trim(),
+
+        ...readSchoolExtra(),
+
+        updatedAt:
+            firebase.firestore.FieldValue.serverTimestamp()
+
+    };
+
+
+    const instEl = document.getElementById("institutionName");
+    const schEl = document.getElementById("schoolName");
+    instEl.style.borderColor = data.institution ? "" : "#d00";
+    schEl.style.borderColor = data.schoolName ? "" : "#d00";
+
+    if(!data.institution){
+
+        alert("સંસ્થાનું નામ લખવું ફરજિયાત છે.");
+
+        instEl.focus();
+
+        return;
+
+    }
+
+
+    if(!data.schoolName){
+
+        alert("શાળાનું નામ લખવું ફરજિયાત છે.");
+
+        schEl.focus();
+
+        return;
+
+    }
+
+
+    if(!data.academicYear){
+
+        alert("શૈક્ષણિક વર્ષ પસંદ કરો.");
+
+        return;
+
+    }
+
+
+    try{
+
+        showLoading(true);
+
+
+        await db
+            .collection("schools")
+            .doc(currentUser.uid)
+            .set(data,{merge:true});
+
+
+        document.getElementById(
+            "schoolStatus"
+        ).style.color = "green";
+
+
+        document.getElementById(
+            "schoolStatus"
+        ).innerText =
+            "શાળાની વિગત સફળતાપૂર્વક સાચવાઈ ગઈ.";
+
+
+        updateAllClassTexts();
+
+
+    }catch(error){
+
+        document.getElementById(
+            "schoolStatus"
+        ).style.color = "red";
+
+
+        document.getElementById(
+            "schoolStatus"
+        ).innerText =
+            error.message;
+
+    }finally{
+
+        showLoading(false);
+
+    }
+
+}
+
+
+/* =========================================================
+   LOAD SCHOOL
+========================================================= */
+
+async function loadSchoolInfo(){
+
+    if(!currentUser) return;
+
+
+    try{
+
+        const snap =
+            await db
+                .collection("schools")
+                .doc(currentUser.uid)
+                .get();
+
+
+        if(snap.exists){
+
+            const data =
+                snap.data();
+
+
+            document.getElementById(
+                "schoolName"
+            ).value =
+                data.schoolName || "";
+
+
+            document.getElementById(
+                "schoolCode"
+            ).value =
+                data.schoolCode || "";
+
+
+            document.getElementById(
+                "academicYear"
+            ).value =
+                data.academicYear || "";
+
+
+            document.getElementById(
+                "schoolAddress"
+            ).value =
+                data.address || "";
+
+            applySchoolExtra(data);
+
+
+            updateAllClassTexts();
+
+        }
+
+    }catch(error){
+
+        console.log(
+            "School load error:",
+            error
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   ACADEMIC YEAR CHANGE
+========================================================= */
+
+document
+    .getElementById("academicYear")
+    .addEventListener("change",function(){
+
+        updateAllClassTexts();
+
+    });
+
+
+/* =========================================================
+   ADD STUDENT ROW
+========================================================= */
+
+function addStudentRow(data = {}){
+
+    if(
+        !selectedStandard ||
+        !selectedDivision
+    ){
+
+        alert(
+            "પહેલા મુખ્ય પેજ પરથી ધોરણ અને વર્ગ પસંદ કરો."
+        );
+
+        return;
+
+    }
+
+
+    const tbody =
+        document.getElementById(
+            "studentTableBody"
+        );
+
+
+    const index =
+        tbody.children.length + 1;
+
+
+    const tr =
+        document.createElement("tr");
+
+
+    tr.innerHTML = `
+
+        <td class="sr">
+            ${index}
+        </td>
+
+
+        <td>
+
+            <input
+                type="text"
+                class="stu-name"
+                value="${escapeHtml(data.name || "")}"
+                placeholder="વિદ્યાર્થીનું નામ">
+
+        </td>
+
+
+        <td>
+
+            <input
+                type="text"
+                class="stu-gr"
+                value="${escapeHtml(data.gr || "")}"
+                placeholder="વ.પ.નં.">
+
+        </td>
+
+
+        <td>
+
+            <input
+                type="text"
+                class="stu-dob"
+                value="${escapeHtml(data.dob || "")}"
+                placeholder="DD/MM/YYYY"
+                maxlength="10"
+                inputmode="numeric"
+                oninput="formatDOB(this)">
+
+        </td>
+
+
+        <td>
+
+            <select class="stu-category">
+
+                <option value="">
+                    -- પસંદ --
+                </option>
+
+                <option value="SC"
+                    ${data.category==="SC" ? "selected" : ""}>
+                    SC
+                </option>
+
+                <option value="ST"
+                    ${data.category==="ST" ? "selected" : ""}>
+                    ST
+                </option>
+
+                <option value="OBC"
+                    ${data.category==="OBC" ? "selected" : ""}>
+                    OBC
+                </option>
+
+                <option value="GEN"
+                    ${data.category==="GEN" ? "selected" : ""}>
+                    GEN
+                </option>
+
+            </select>
+
+        </td>
+
+
+        <td>
+
+            <select class="stu-gender">
+
+                <option value="">
+                    -- પસંદ --
+                </option>
+
+                <option value="BOY"
+                    ${data.gender==="BOY" ? "selected" : ""}>
+                    BOY
+                </option>
+
+                <option value="GIRL"
+                    ${data.gender==="GIRL" ? "selected" : ""}>
+                    GIRL
+                </option>
+
+            </select>
+
+        </td>
+
+
+        <td>
+
+            <button
+                class="delete-btn"
+                onclick="deleteStudentRow(this)">
+                ×
+            </button>
+
+        </td>
+
+    `;
+
+
+    tbody.appendChild(tr);
+
+}
+
+
+/* =========================================================
+   DOB FORMAT
+========================================================= */
+
+function formatDOB(input){
+
+    let value =
+        input.value
+            .replace(/\D/g,"");
+
+
+    if(value.length > 2){
+
+        value =
+            value.substring(0,2)
+            + "/"
+            + value.substring(2);
+
+    }
+
+
+    if(value.length > 5){
+
+        value =
+            value.substring(0,5)
+            + "/"
+            + value.substring(5);
+
+    }
+
+
+    input.value =
+        value.substring(0,10);
+
+}
+
+
+/* =========================================================
+   VALIDATE DOB
+========================================================= */
+
+function validDOB(value){
+
+    if(!value) return true;
+
+
+    const match =
+        value.match(
+            /^(\d{2})\/(\d{2})\/(\d{4})$/
+        );
+
+
+    if(!match) return false;
+
+
+    const day =
+        Number(match[1]);
+
+    const month =
+        Number(match[2]);
+
+    const year =
+        Number(match[3]);
+
+
+    if(
+        month < 1 ||
+        month > 12 ||
+        day < 1
+    ){
+
+        return false;
+
+    }
+
+
+    const maxDay =
+        new Date(
+            year,
+            month,
+            0
+        ).getDate();
+
+
+    return day <= maxDay;
+
+}
+
+
+/* =========================================================
+   DELETE ROW
+========================================================= */
+
+function deleteStudentRow(button){
+
+    button
+        .closest("tr")
+        .remove();
+
+
+    renumberRows();
+
+}
+
+
+/* =========================================================
+   RENUMBER
+========================================================= */
+
+function renumberRows(){
+
+    document
+        .querySelectorAll(
+            "#studentTableBody tr"
+        )
+        .forEach(function(row,index){
+
+            row.querySelector(
+                ".sr"
+            ).innerText =
+                index + 1;
+
+        });
+
+}
+
+
+/* =========================================================
+   SAVE STUDENTS
+========================================================= */
+
+async function saveStudents(){
+
+    if(!currentUser){
+
+        alert("Login જરૂરી છે.");
+
+        return;
+
+    }
+
+
+    if(
+        !selectedStandard ||
+        !selectedDivision
+    ){
+
+        alert(
+            "પહેલા ધોરણ અને વર્ગ પસંદ કરો."
+        );
+
+        return;
+
+    }
+
+
+    const rows =
+        document.querySelectorAll(
+            "#studentTableBody tr"
+        );
+
+
+    if(rows.length === 0){
+
+        alert(
+            "કોઈ વિદ્યાર્થી નથી."
+        );
+
+        return;
+
+    }
+
+
+    const year =
+        document.getElementById(
+            "academicYear"
+        ).value;
+
+
+    if(!year){
+
+        alert(
+            "પહેલા શૈક્ષણિક વર્ષ પસંદ કરો."
+        );
+
+        showPage("school");
+
+        return;
+
+    }
+
+
+    /* Validate rows */
+
+    for(
+        let i=0;
+        i<rows.length;
+        i++
+    ){
+
+        const row =
+            rows[i];
+
+
+        const name =
+            row.querySelector(
+                ".stu-name"
+            ).value.trim();
+
+
+        const dob =
+            row.querySelector(
+                ".stu-dob"
+            ).value.trim();
+
+
+        const category =
+            row.querySelector(
+                ".stu-category"
+            ).value;
+
+
+        const gender =
+            row.querySelector(
+                ".stu-gender"
+            ).value;
+
+
+        if(!name){
+
+            alert(
+                "ક્રમ " +
+                (i+1) +
+                " નું વિદ્યાર્થીનું નામ નાખો."
+            );
+
+            return;
+
+        }
+
+
+        if(dob && !validDOB(dob)){
+
+            alert(
+                "ક્રમ " +
+                (i+1) +
+                " ની જન્મ તારીખ DD/MM/YYYY માં સાચી નાખો."
+            );
+
+            return;
+
+        }
+
+
+        if(
+            category &&
+            !validCategory(category)
+        ){
+
+            alert(
+                "ક્રમ " +
+                (i+1) +
+                " ની કેટેગરી ખોટી છે."
+            );
+
+            return;
+
+        }
+
+
+        if(
+            gender &&
+            !validGender(gender)
+        ){
+
+            alert(
+                "ક્રમ " +
+                (i+1) +
+                " નું BOY/GIRL ખોટું છે."
+            );
+
+            return;
+
+        }
+
+    }
+
+
+    showLoading(true);
+
+
+    try{
+
+        const classId =
+            selectedStandard +
+            "_" +
+            selectedDivision;
+
+
+        const classRef =
+            db
+                .collection("students")
+                .doc(currentUser.uid)
+                .collection("classes")
+                .doc(classId);
+
+
+        const oldSnap =
+            await classRef
+                .collection("students")
+                .get();
+
+
+        const batch =
+            db.batch();
+
+
+        /* Delete old records */
+
+        oldSnap.forEach(function(doc){
+
+            batch.delete(doc.ref);
+
+        });
+
+
+        /* Save current records */
+
+        rows.forEach(function(row,index){
+
+            const student = {
+
+                uid:
+                    currentUser.uid,
+
+                standard:
+                    selectedStandard,
+
+                division:
+                    selectedDivision,
+
+                academicYear:
+                    year,
+
+                srNo:
+                    index + 1,
+
+                name:
+                    row
+                        .querySelector(
+                            ".stu-name"
+                        )
+                        .value
+                        .trim(),
+
+                gr:
+                    row
+                        .querySelector(
+                            ".stu-gr"
+                        )
+                        .value
+                        .trim(),
+
+                dob:
+                    row
+                        .querySelector(
+                            ".stu-dob"
+                        )
+                        .value
+                        .trim(),
+
+                category:
+                    row
+                        .querySelector(
+                            ".stu-category"
+                        )
+                        .value,
+
+                gender:
+                    row
+                        .querySelector(
+                            ".stu-gender"
+                        )
+                        .value,
+
+                updatedAt:
+                    firebase
+                        .firestore
+                        .FieldValue
+                        .serverTimestamp()
+
+            };
+
+
+            const ref =
+                classRef
+                    .collection("students")
+                    .doc(
+                        String(index + 1)
+                    );
+
+
+            batch.set(
+                ref,
+                student
+            );
+
+        });
+
+
+        await batch.commit();
+
+
+        document.getElementById(
+            "studentStatus"
+        ).style.color = "green";
+
+
+        document.getElementById(
+            "studentStatus"
+        ).innerText =
+            rows.length +
+            " વિદ્યાર્થીની માહિતી સફળતાપૂર્વક સાચવાઈ ગઈ.";
+
+
+        await loadStudents();
+
+
+    }catch(error){
+
+        console.log(error);
+
+
+        document.getElementById(
+            "studentStatus"
+        ).style.color = "red";
+
+
+        document.getElementById(
+            "studentStatus"
+        ).innerText =
+            error.message;
+
+    }finally{
+
+        showLoading(false);
+
+    }
+
+}
+
+
+/* =========================================================
+   LOAD STUDENTS
+========================================================= */
+
+async function loadStudents(){
+
+    if(!currentUser) return;
+
+
+    if(
+        !selectedStandard ||
+        !selectedDivision
+    ){
+
+        const savedStandard =
+            lsGet(
+                "selectedStandard"
+            );
+
+
+        const savedDivision =
+            lsGet(
+                "selectedDivision"
+            );
+
+
+        if(
+            savedStandard &&
+            savedDivision
+        ){
+
+            selectedStandard =
+                savedStandard;
+
+            selectedDivision =
+                savedDivision;
+
+
+            document.getElementById(
+                "standardSelect"
+            ).value =
+                selectedStandard;
+
+
+            document.getElementById(
+                "divisionSelect"
+            ).value =
+                selectedDivision;
+
+        }else{
+
+            return;
+
+        }
+
+    }
+
+
+    updateAllClassTexts();
+
+
+    try{
+
+        const classId =
+            selectedStandard +
+            "_" +
+            selectedDivision;
+
+
+        const snap =
+            await db
+                .collection("students")
+                .doc(currentUser.uid)
+                .collection("classes")
+                .doc(classId)
+                .collection("students")
+                .get();
+
+
+        students = [];
+
+
+        snap.forEach(function(doc){
+
+            students.push(
+                doc.data()
+            );
+
+        });
+
+
+        students.sort(function(a,b){
+
+            return (
+                (a.srNo || 0) -
+                (b.srNo || 0)
+            );
+
+        });
+
+
+        renderStudents();
+
+
+    }catch(error){
+
+        console.log(
+            "Student load error:",
+            error
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   RENDER STUDENTS
+========================================================= */
+
+function renderStudents(){
+
+    const tbody =
+        document.getElementById(
+            "studentTableBody"
+        );
+
+
+    tbody.innerHTML = "";
+
+
+    students.forEach(function(student){
+
+        addStudentRow(student);
+
+    });
+
+}
+
+
+/* =========================================================
+   EXCEL TEMPLATE
+   NO STANDARD / DIVISION COLUMN
+========================================================= */
+
+async function downloadTemplate(){
+
+    try{
+
+        if(typeof ExcelJS === "undefined"){
+
+            alert(
+                "Excel Template Library લોડ થઈ નથી. Internet ચાલુ રાખો અને ફરી પ્રયાસ કરો."
+            );
+
+            return;
+
+        }
+
+
+        const workbook =
+            new ExcelJS.Workbook();
+
+
+        const worksheet =
+            workbook.addWorksheet(
+                "વિદ્યાર્થી"
+            );
+
+
+        worksheet.columns = [
+
+            {
+                header:"ક્રમ",
+                key:"sr",
+                width:8
+            },
+
+            {
+                header:"વિદ્યાર્થીનું નામ",
+                key:"name",
+                width:30
+            },
+
+            {
+                header:"વ.પ.નં.",
+                key:"gr",
+                width:15
+            },
+
+            {
+                header:"જન્મ તારીખ",
+                key:"dob",
+                width:18
+            },
+
+            {
+                header:"કેટેગરી",
+                key:"category",
+                width:16
+            },
+
+            {
+                header:"કુમાર/કન્યા",
+                key:"gender",
+                width:18
+            }
+
+        ];
+
+
+        /* 40 rows */
+
+        for(
+            let i=1;
+            i<=40;
+            i++
+        ){
+
+            worksheet.addRow({
+
+                sr:i,
+
+                name:"",
+
+                gr:"",
+
+                dob:"",
+
+                category:"",
+
+                gender:""
+
+            });
+
+        }
+
+
+        /* Header style */
+
+        const headerRow =
+            worksheet.getRow(1);
+
+
+        headerRow.font = {
+
+            bold:true
+
+        };
+
+
+        headerRow.alignment = {
+
+            vertical:"middle",
+
+            horizontal:"center"
+
+        };
+
+
+        headerRow.height = 25;
+
+
+        /* Borders */
+
+        worksheet.eachRow(
+            function(row){
+
+                row.eachCell(
+                    function(cell){
+
+                        cell.border = {
+
+                            top:{
+                                style:"thin"
+                            },
+
+                            left:{
+                                style:"thin"
+                            },
+
+                            bottom:{
+                                style:"thin"
+                            },
+
+                            right:{
+                                style:"thin"
+                            }
+
+                        };
+
+                    }
+                );
+
+            }
+        );
+
+
+        /* =========================
+           CATEGORY DROPDOWN
+        ========================= */
+
+        for(
+            let i=2;
+            i<=41;
+            i++
+        ){
+
+            worksheet.getCell(
+                "E" + i
+            ).dataValidation = {
+
+                type:"list",
+
+                allowBlank:true,
+
+                formulae:[
+                    '"SC,ST,OBC,GEN"'
+                ]
+
+            };
+
+        }
+
+
+        /* =========================
+           BOY GIRL DROPDOWN
+        ========================= */
+
+        for(
+            let i=2;
+            i<=41;
+            i++
+        ){
+
+            worksheet.getCell(
+                "F" + i
+            ).dataValidation = {
+
+                type:"list",
+
+                allowBlank:true,
+
+                formulae:[
+                    '"BOY,GIRL"'
+                ]
+
+            };
+
+        }
+
+
+        /* =========================
+           DOB DD/MM/YYYY
+        ========================= */
+
+        for(
+            let i=2;
+            i<=41;
+            i++
+        ){
+
+            const cell =
+                worksheet.getCell(
+                    "D" + i
+                );
+
+
+            cell.numFmt =
+                "@";
+
+
+            cell.dataValidation = {
+
+                type:"custom",
+
+                allowBlank:true,
+
+                formulae:[
+                    `=OR(D${i}="",AND(LEN(D${i})=10,MID(D${i},3,1)="/",MID(D${i},6,1)="/"))`
+                ],
+
+                showErrorMessage:true,
+
+                errorTitle:
+                    "જન્મ તારીખ",
+
+                error:
+                    "DD/MM/YYYY ફોર્મેટમાં તારીખ લખો."
+
+            };
+
+        }
+
+
+        /* Instructions */
+
+        worksheet.getCell("H1").value =
+            "મહત્વની સૂચના";
+
+
+        worksheet.getCell("H2").value =
+            "1. ધોરણ અને વર્ગ Excelમાં લખવાના નથી.";
+
+
+        worksheet.getCell("H3").value =
+            "2. જન્મ તારીખ DD/MM/YYYY માં લખવી.";
+
+
+        worksheet.getCell("H4").value =
+            "3. કેટેગરી: SC / ST / OBC / GEN";
+
+
+        worksheet.getCell("H5").value =
+            "4. કુમાર/કન્યા: BOY / GIRL";
+
+
+        worksheet.getColumn("H").width =
+            45;
+
+
+        /* Freeze header */
+
+        worksheet.views = [
+
+            {
+                state:"frozen",
+                ySplit:1
+            }
+
+        ];
+
+
+        const buffer =
+            await workbook.xlsx.writeBuffer();
+
+
+        const blob =
+            new Blob(
+                [buffer],
+                {
+                    type:
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                }
+            );
+
+
+        const url =
+            URL.createObjectURL(blob);
+
+
+        const a =
+            document.createElement("a");
+
+
+        a.href = url;
+
+
+        a.download =
+            "Student_Template.xlsx";
+
+
+        document.body.appendChild(a);
+
+
+        a.click();
+
+
+        document.body.removeChild(a);
+
+
+        URL.revokeObjectURL(url);
+
+
+    }catch(error){
+
+        console.error(error);
+
+
+        alert(
+            "Excel Template બનાવવામાં સમસ્યા:\n" +
+            error.message
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   EXCEL IMPORT
+========================================================= */
+
+function importExcel(event){
+
+    const file =
+        event.target.files[0];
+
+
+    if(!file){
+
+        return;
+
+    }
+
+
+    if(
+        !selectedStandard ||
+        !selectedDivision
+    ){
+
+        alert(
+            "પહેલા ધોરણ અને વર્ગ પસંદ કરો."
+        );
+
+        event.target.value = "";
+
+        return;
+
+    }
+
+
+    const reader =
+        new FileReader();
+
+
+    reader.onload =
+        function(e){
+
+            try{
+
+                const data =
+                    new Uint8Array(
+                        e.target.result
+                    );
+
+
+                const workbook =
+                    XLSX.read(
+                        data,
+                        {
+                            type:"array",
+                            cellDates:true,
+                            raw:false
+                        }
+                    );
+
+
+                const sheetName =
+                    workbook.SheetNames[0];
+
+
+                const sheet =
+                    workbook.Sheets[
+                        sheetName
+                    ];
+
+
+                const rows =
+                    XLSX.utils.sheet_to_json(
+                        sheet,
+                        {
+                            header:1,
+                            defval:"",
+                            raw:false,
+                            dateNF:"dd/mm/yyyy"
+                        }
+                    );
+
+
+                if(rows.length < 2){
+
+                    alert(
+                        "Excelમાં વિદ્યાર્થીની માહિતી નથી."
+                    );
+
+                    return;
+
+                }
+
+
+                const tbody =
+                    document.getElementById(
+                        "studentTableBody"
+                    );
+
+
+                tbody.innerHTML = "";
+
+
+                let importedCount = 0;
+
+
+                for(
+                    let i=1;
+                    i<rows.length;
+                    i++
+                ){
+
+                    const row =
+                        rows[i];
+
+
+                    if(
+                        !row ||
+                        row.length === 0
+                    ){
+
+                        continue;
+
+                    }
+
+
+                    /*
+                       IMPORTANT:
+                       Template columns:
+
+                       0 = ક્રમ
+                       1 = નામ
+                       2 = વ.પ.નં.
+                       3 = DOB
+                       4 = Category
+                       5 = Gender
+
+                       Standard/Division નથી.
+                    */
+
+
+                    const name =
+                        String(
+                            row[1] || ""
+                        ).trim();
+
+
+                    const gr =
+                        String(
+                            row[2] || ""
+                        ).trim();
+
+
+                    let dob =
+                        row[3];
+
+
+                    let category =
+                        String(
+                            row[4] || ""
+                        )
+                        .trim()
+                        .toUpperCase();
+
+
+                    let gender =
+                        String(
+                            row[5] || ""
+                        )
+                        .trim()
+                        .toUpperCase();
+
+
+                    if(
+                        name === "" &&
+                        gr === ""
+                    ){
+
+                        continue;
+
+                    }
+
+
+                    /* DOB */
+
+                    dob =
+                        normalizeDOB(
+                            dob
+                        );
+
+
+                    /* CATEGORY */
+
+                    category =
+                        normalizeCategory(
+                            category
+                        );
+
+
+                    /* GENDER */
+
+                    gender =
+                        normalizeGender(
+                            gender
+                        );
+
+
+                    addStudentRow({
+
+                        name:name,
+
+                        gr:gr,
+
+                        dob:dob,
+
+                        category:
+                            validCategory(
+                                category
+                            )
+                            ? category
+                            : "",
+
+                        gender:
+                            validGender(
+                                gender
+                            )
+                            ? gender
+                            : ""
+
+                    });
+
+
+                    importedCount++;
+
+                }
+
+
+                if(importedCount === 0){
+
+                    alert(
+                        "Excelમાંથી કોઈ વિદ્યાર્થી મળ્યો નથી.\n\n" +
+                        "કૃપા કરીને Templateના પ્રથમ 6 કોલમમાં જ માહિતી ભરો."
+                    );
+
+                    return;
+
+                }
+
+
+                alert(
+                    importedCount +
+                    " વિદ્યાર્થી Excelમાંથી Import થયા.\n\n" +
+                    "હવે 'બધા વિદ્યાર્થી સાચવો' દબાવો."
+                );
+
+
+            }catch(error){
+
+                console.error(error);
+
+
+                alert(
+                    "Excel Importમાં સમસ્યા:\n" +
+                    error.message
+                );
+
+            }
+
+        };
+
+
+    reader.readAsArrayBuffer(file);
+
+
+    event.target.value = "";
+
+}
+
+
+/* =========================================================
+   NORMALIZE CATEGORY
+========================================================= */
+
+function normalizeCategory(value){
+
+    let s =
+        String(value || "")
+        .trim()
+        .toUpperCase();
+
+
+    if(
+        s === "SC" ||
+        s === "એસસી"
+    ){
+
+        return "SC";
+
+    }
+
+
+    if(
+        s === "ST" ||
+        s === "એસટી"
+    ){
+
+        return "ST";
+
+    }
+
+
+    if(
+        s === "OBC" ||
+        s === "ઓબીસી"
+    ){
+
+        return "OBC";
+
+    }
+
+
+    if(
+        s === "GEN" ||
+        s === "GENERAL" ||
+        s === "GENERAL CATEGORY" ||
+        s === "સામાન્ય" ||
+        s === "જનરલ"
+    ){
+
+        return "GEN";
+
+    }
+
+
+    return "";
+
+}
+
+
+/* =========================================================
+   NORMALIZE GENDER
+========================================================= */
+
+function normalizeGender(value){
+
+    let s =
+        String(value || "")
+        .trim()
+        .toUpperCase();
+
+
+    if(
+        s === "BOY" ||
+        s === "KUMAR" ||
+        s === "કુમાર" ||
+        s === "છોકરો" ||
+        s === "છોકરા"
+    ){
+
+        return "BOY";
+
+    }
+
+
+    if(
+        s === "GIRL" ||
+        s === "KANYA" ||
+        s === "કન્યા" ||
+        s === "છોકરી" ||
+        s === "છોકરીઓ"
+    ){
+
+        return "GIRL";
+
+    }
+
+
+    return "";
+
+}
+
+
+/* =========================================================
+   VALID CATEGORY
+========================================================= */
+
+function validCategory(value){
+
+    return [
+        "SC",
+        "ST",
+        "OBC",
+        "GEN"
+    ].includes(value);
+
+}
+
+
+/* =========================================================
+   VALID GENDER
+========================================================= */
+
+function validGender(value){
+
+    return [
+        "BOY",
+        "GIRL"
+    ].includes(value);
+
+}
+
+
+/* =========================================================
+   NORMALIZE DOB
+========================================================= */
+
+function normalizeDOB(value){
+
+    if(
+        value === null ||
+        value === undefined ||
+        value === ""
+    ){
+
+        return "";
+
+    }
+
+
+    /* JavaScript Date */
+
+    if(
+        Object.prototype.toString.call(value)
+        === "[object Date]"
+    ){
+
+        if(!isNaN(value.getTime())){
+
+            return (
+                String(
+                    value.getDate()
+                ).padStart(2,"0")
+                +
+                "/"
+                +
+                String(
+                    value.getMonth()+1
+                ).padStart(2,"0")
+                +
+                "/"
+                +
+                value.getFullYear()
+            );
+
+        }
+
+    }
+
+
+    let s =
+        String(value)
+        .trim();
+
+
+    /* dd/mm/yyyy */
+
+    let match =
+        s.match(
+            /^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/
+        );
+
+
+    if(match){
+
+        return (
+            String(
+                match[1]
+            ).padStart(2,"0")
+            +
+            "/"
+            +
+            String(
+                match[2]
+            ).padStart(2,"0")
+            +
+            "/"
+            +
+            match[3]
+        );
+
+    }
+
+
+    /*
+       Excel serial number
+    */
+
+    if(
+        /^\d+(\.\d+)?$/.test(s)
+    ){
+
+        const n =
+            Number(s);
+
+
+        if(
+            n > 20000 &&
+            n < 70000
+        ){
+
+            const date =
+                XLSX.SSF.parse_date_code(
+                    n
+                );
+
+
+            if(date){
+
+                return (
+                    String(
+                        date.d
+                    ).padStart(2,"0")
+                    +
+                    "/"
+                    +
+                    String(
+                        date.m
+                    ).padStart(2,"0")
+                    +
+                    "/"
+                    +
+                    date.y
+                );
+
+            }
+
+        }
+
+    }
+
+
+    return s;
+
+}
+
+
+/* =========================================================
+   EXCEL EXPORT
+========================================================= */
+
+async function exportExcel(){
+
+    try{
+
+        if(typeof ExcelJS === "undefined"){
+
+            alert(
+                "Excel Library લોડ થઈ નથી."
+            );
+
+            return;
+
+        }
+
+
+        const workbook =
+            new ExcelJS.Workbook();
+
+
+        const worksheet =
+            workbook.addWorksheet(
+                "વિદ્યાર્થી"
+            );
+
+
+        worksheet.columns = [
+
+            {
+                header:"ક્રમ",
+                key:"sr",
+                width:8
+            },
+
+            {
+                header:"વિદ્યાર્થીનું નામ",
+                key:"name",
+                width:30
+            },
+
+            {
+                header:"વ.પ.નં.",
+                key:"gr",
+                width:15
+            },
+
+            {
+                header:"જન્મ તારીખ",
+                key:"dob",
+                width:18
+            },
+
+            {
+                header:"કેટેગરી",
+                key:"category",
+                width:16
+            },
+
+            {
+                header:"કુમાર/કન્યા",
+                key:"gender",
+                width:18
+            }
+
+        ];
+
+
+        const trs =
+            document.querySelectorAll(
+                "#studentTableBody tr"
+            );
+
+
+        trs.forEach(
+            function(tr,index){
+
+                worksheet.addRow({
+
+                    sr:
+                        index + 1,
+
+                    name:
+                        tr
+                        .querySelector(
+                            ".stu-name"
+                        )
+                        .value
+                        .trim(),
+
+                    gr:
+                        tr
+                        .querySelector(
+                            ".stu-gr"
+                        )
+                        .value
+                        .trim(),
+
+                    dob:
+                        tr
+                        .querySelector(
+                            ".stu-dob"
+                        )
+                        .value
+                        .trim(),
+
+                    category:
+                        tr
+                        .querySelector(
+                            ".stu-category"
+                        )
+                        .value,
+
+                    gender:
+                        tr
+                        .querySelector(
+                            ".stu-gender"
+                        )
+                        .value
+
+                });
+
+            }
+        );
+
+
+        /* Header */
+
+        const header =
+            worksheet.getRow(1);
+
+
+        header.font = {
+
+            bold:true
+
+        };
+
+
+        header.alignment = {
+
+            horizontal:"center",
+
+            vertical:"middle"
+
+        };
+
+
+        /* Dropdown */
+
+        for(
+            let i=2;
+            i<=Math.max(
+                41,
+                trs.length+1
+            );
+            i++
+        ){
+
+            worksheet.getCell(
+                "E"+i
+            ).dataValidation = {
+
+                type:"list",
+
+                allowBlank:true,
+
+                formulae:[
+                    '"SC,ST,OBC,GEN"'
+                ]
+
+            };
+
+
+            worksheet.getCell(
+                "F"+i
+            ).dataValidation = {
+
+                type:"list",
+
+                allowBlank:true,
+
+                formulae:[
+                    '"BOY,GIRL"'
+                ]
+
+            };
+
+        }
+
+
+        worksheet.views = [
+
+            {
+                state:"frozen",
+                ySplit:1
+            }
+
+        ];
+
+
+        const buffer =
+            await workbook.xlsx.writeBuffer();
+
+
+        const blob =
+            new Blob(
+                [buffer],
+                {
+                    type:
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                }
+            );
+
+
+        const url =
+            URL.createObjectURL(blob);
+
+
+        const a =
+            document.createElement("a");
+
+
+        a.href = url;
+
+
+        a.download =
+            "Students_" +
+            selectedStandard +
+            "_" +
+            selectedDivision +
+            ".xlsx";
+
+
+        document.body.appendChild(a);
+
+
+        a.click();
+
+
+        document.body.removeChild(a);
+
+
+        URL.revokeObjectURL(url);
+
+
+    }catch(error){
+
+        console.error(error);
+
+
+        alert(
+            "Excel Exportમાં સમસ્યા:\n" +
+            error.message
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   ESCAPE HTML
+========================================================= */
+
+function escapeHtml(value){
+
+    return String(value)
+
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+
+        .replace(
+            /</g,
+            "&lt;"
+        )
+
+        .replace(
+            />/g,
+            "&gt;"
+        )
+
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+
+        .replace(
+            /'/g,
+            "&#039;"
+        );
+
+}
+
+
+/* =========================================================
+   FIREBASE ERROR
+========================================================= */
+
+function firebaseError(error){
+
+    const code =
+        error.code || "";
+
+    if(code === "timeout"){
+        return "લોગ ઇન થવામાં વધુ સમય લાગે છે. Internet તપાસી ફરી પ્રયાસ કરો.";
+    }
+
+
+    if(
+        code ===
+        "auth/invalid-credential"
+    ){
+
+        return "ઇ-મેઇલ અથવા પાસવર્ડ ખોટો છે.";
+
+    }
+
+
+    if(
+        code ===
+        "auth/user-not-found"
+    ){
+
+        return "આ ઇ-મેઇલથી User મળ્યો નથી.";
+
+    }
+
+
+    if(
+        code ===
+        "auth/wrong-password"
+    ){
+
+        return "પાસવર્ડ ખોટો છે.";
+
+    }
+
+
+    if(
+        code ===
+        "auth/email-already-in-use"
+    ){
+
+        return "આ ઇ-મેઇલ પહેલેથી Register છે.";
+
+    }
+
+
+    if(
+        code ===
+        "auth/weak-password"
+    ){
+
+        return "પાસવર્ડ ઓછામાં ઓછો 6 અક્ષરનો હોવો જોઈએ.";
+
+    }
+
+
+    if(
+        code ===
+        "auth/invalid-email"
+    ){
+
+        return "ઇ-મેઇલ સરખો લખો.";
+
+    }
+
+
+    if(
+        code ===
+        "auth/network-request-failed"
+    ){
+
+        return "Internet connection તપાસો.";
+
+    }
+
+
+    if(
+        code ===
+        "permission-denied"
+    ){
+
+        return "Firebase Firestore Rulesમાં permission સમસ્યા છે.";
+
+    }
+
+
+    return (
+        error.message ||
+        "કોઈક સમસ્યા આવી."
+    );
+
+}
+
+
+/* =========================================================
+   STARTUP
+========================================================= */
+
+(function(){
+
+    const savedStandard =
+        lsGet(
+            "selectedStandard"
+        );
+
+
+    const savedDivision =
+        lsGet(
+            "selectedDivision"
+        );
+
+
+    if(savedStandard){
+
+        selectedStandard =
+            savedStandard;
+
+
+        document.getElementById(
+            "standardSelect"
+        ).value =
+            savedStandard;
+
+    }
+
+
+    if(savedDivision){
+
+        selectedDivision =
+            savedDivision;
+
+
+        document.getElementById(
+            "divisionSelect"
+        ).value =
+            savedDivision;
+
+    }
+
+
+    updateAllClassTexts();
+
+})();
+
+
+/* =========================================================
+   TRIMASIK / SATRANT KASOTI
+========================================================= */
+
+const TRI_SUBJECTS = [
+  {id:"guj",  name:"ગુજરાતી"},
+  {id:"math", name:"ગણિત"},
+  {id:"hindi",name:"હિન્દી"},
+  {id:"eng",  name:"અંગ્રેજી"},
+  {id:"sci",  name:"વિજ્ઞાન"},
+  {id:"ss",   name:"સામાજિક વિજ્ઞાન"},
+  {id:"skt",  name:"સંસ્કૃત"}
+];
+
+const EXAM_KINDS = {
+  tri:{label:"ત્રિમાસિક કસોટી", doc:"trimasik"},
+  sat:{label:"સત્રાંત કસોટી",   doc:"satrant"}
+};
+
+function exportBar(p){
+  return `<div class="export-bar">
+    <button class="action-btn pdf" onclick="saveReportPdf('${p}')">📄 PDF સેવ</button>
+    <button class="action-btn excel" onclick="exportReportExcel('${p}')">📊 Excel Export</button>
+    <button class="action-btn print" onclick="printReport('${p}')">🖨️ પ્રિન્ટ</button>
+  </div>`;
+}
+
+function renderExamForm(kind,sem){
+  const p = kind+sem;
+  const box = document.getElementById(kind+"-sem"+sem);
+  if(!selectedStandard || !selectedDivision){
+    box.innerHTML = '<div class="info-box">પહેલા મુખ્ય પેજ પરથી ધોરણ અને વર્ગ પસંદ કરો.</div>';
+    box.dataset.cls = "";
+    return;
+  }
+  const cls = selectedStandard+"_"+selectedDivision;
+  // ફોર્મ ફરી ન બને તો પસંદગી જળવાય (વર્ગ બદલાય તો નવું બને)
+  if(box.dataset.cls===cls && box.querySelector("#"+p+"_subject")) return;
+  box.dataset.cls = cls;
+
+  box.innerHTML = `
+    <div class="form-grid">
+      <div>
+        <label>વિષય</label>
+        <select id="${p}_subject" onchange="onExamSubject('${kind}',${sem})">
+          <option value="">-- વિષય પસંદ કરો --</option>
+          ${TRI_SUBJECTS.map(s=>`<option value="${s.id}">${s.name}</option>`).join("")}
+        </select>
+      </div>
+      <div>
+        <label>પ્રશ્નોની સંખ્યા</label>
+        <input id="${p}_qcount" type="number" min="1" max="20" placeholder="દા.ત. 5">
+      </div>
+    </div>
+    <button class="primary-btn" onclick="createExamTable('${kind}',${sem})">ગુણ દાખલ કરો</button>
+    <div id="${p}_table" style="margin-top:15px"></div>
+    <div id="${p}_status" class="status"></div>
+
+    <div style="margin-top:25px;border-top:2px solid #ddd;padding-top:15px">
+      <h3 style="color:#202d71;margin:0 0 5px">📑 બધા વિષય એક જ પેજમાં</h3>
+      <div style="color:#555;font-size:14px;margin-bottom:8px">સાચવેલા બધા વિષયના કુલ ગુણ, છેલ્લે કુલ, ટકા અને ક્રમાંક સાથે.</div>
+      <div class="export-bar">
+        <button class="action-btn pdf" onclick="examAll('${kind}',${sem},'pdf')">📄 PDF સેવ</button>
+        <button class="action-btn excel" onclick="examAll('${kind}',${sem},'excel')">📊 Excel Export</button>
+        <button class="action-btn print" onclick="examAll('${kind}',${sem},'print')">🖨️ પ્રિન્ટ</button>
+      </div>
+    </div>
+  `;
+}
+
+/* વિષય પસંદ કરતા અગાઉ લખેલી પ્રશ્નોની સંખ્યા આપોઆપ દેખાય (બદલી પણ શકાય) */
+async function onExamSubject(kind,sem){
+  const p = kind+sem;
+  const sid = document.getElementById(p+"_subject").value;
+  const qEl = document.getElementById(p+"_qcount");
+  if(!sid || !qEl) return;
+  try{
+    const snap = await examDocRef(kind,sem,sid).get();
+    if(snap.exists && typeof snap.data().qCount==="number"){
+      qEl.value = snap.data().qCount;
+    }
+  }catch(e){ console.log(e); }
+}
+
+async function createExamTable(kind,sem){
+  const p = kind+sem;
+  const subjectId = document.getElementById(p+"_subject").value;
+  const qn = parseInt(document.getElementById(p+"_qcount").value);
+  const status = document.getElementById(p+"_status");
+  status.style.color="red"; status.innerText="";
+
+  if(!subjectId){ alert("વિષય પસંદ કરો."); return; }
+  if(!qn || qn<1 || qn>20){ alert("પ્રશ્નોની સંખ્યા 1 થી 20 વચ્ચે લખો."); return; }
+  if(students.length===0){ alert("પહેલા વિદ્યાર્થીની માહિતી સાચવો."); return; }
+
+  // જૂનો સાચવેલો ડેટા મેળવો
+  let saved = null;
+  try{
+    showLoading(true);
+    const snap = await examDocRef(kind,sem,subjectId).get();
+    if(snap.exists) saved = snap.data();
+  }catch(e){ console.log(e); }
+  finally{ showLoading(false); }
+
+  let html = `<div class="table-wrap"><table class="tri-table"><thead><tr>
+      <th>ક્રમ</th><th>વિદ્યાર્થીનું નામ</th>`;
+  for(let q=1;q<=qn;q++) html += `<th>પ્ર.${q}</th>`;
+  html += `<th>કુલ ગુણ</th></tr></thead><tbody>`;
+
+  // પ્રશ્નના કુલ ગુણની હરોળ
+  html += `<tr class="tri-maxrow"><td colspan="2">પ્રશ્નના કુલ ગુણ</td>`;
+  for(let q=0;q<qn;q++){
+    const v = saved && saved.maxMarks && saved.maxMarks[q]!==undefined ? saved.maxMarks[q] : "";
+    html += `<td><input type="number" min="0" step="0.5" class="tri-max" data-q="${q}" value="${v}" oninput="onExamMaxInput('${kind}',${sem})"></td>`;
+  }
+  html += `<td class="tri-total" id="${p}_maxTotal">0</td></tr>`;
+
+  // વિદ્યાર્થીની હરોળ
+  students.forEach(function(st){
+    const sm = saved && saved.marks && saved.marks[st.srNo] ? saved.marks[st.srNo].marks : [];
+    html += `<tr data-sr="${st.srNo}" data-name="${escapeHtml(st.name||"")}">
+      <td>${st.srNo}</td><td class="tri-name">${escapeHtml(st.name||"")}</td>`;
+    for(let q=0;q<qn;q++){
+      const v = sm && sm[q]!==undefined && sm[q]!==null ? sm[q] : "";
+      html += `<td><input type="number" min="0" step="0.5" class="tri-mark" data-q="${q}" value="${v}" oninput="onExamMarkInput(this,'${kind}',${sem})"></td>`;
+    }
+    html += `<td class="tri-total tri-rowtotal">0</td></tr>`;
+  });
+
+  html += `</tbody></table></div>
+    <button class="save-btn" onclick="saveExam('${kind}',${sem})">💾 ગુણ સાચવો</button>
+    ${exportBar(p)}`;
+
+  document.getElementById(p+"_table").innerHTML = html;
+  recalcExam(kind,sem);
+}
+
+function examMax(kind,sem,q){
+  const el = document.querySelector(`#${kind}${sem}_table .tri-max[data-q="${q}"]`);
+  return el && el.value!=="" ? parseFloat(el.value) : null;
+}
+
+function onExamMarkInput(input,kind,sem){
+  const q = input.dataset.q;
+  const max = examMax(kind,sem,q);
+  const status = document.getElementById(kind+sem+"_status");
+
+  if(max===null){
+    input.value = "";
+    status.style.color="red";
+    status.innerText = "પહેલા પ્ર."+(parseInt(q)+1)+" ના કુલ ગુણ લખો.";
+    return;
+  }
+  if(input.value!=="" && parseFloat(input.value) > max){
+    input.value = max;
+    status.style.color="red";
+    status.innerText = "પ્ર."+(parseInt(q)+1)+" ના કુલ ગુણ "+max+" કરતા વધુ માર્ક ન લખાય.";
+  }else if(input.value!=="" && parseFloat(input.value) < 0){
+    input.value = 0;
+  }else{
+    status.innerText = "";
+  }
+  recalcExam(kind,sem);
+}
+
+function onExamMaxInput(kind,sem){
+  // કુલ ગુણ ઘટાડો તો જૂના વધારે માર્ક આપોઆપ ઘટી જાય
+  document.querySelectorAll(`#${kind}${sem}_table .tri-mark`).forEach(function(inp){
+    const max = examMax(kind,sem,inp.dataset.q);
+    if(inp.value!=="" && (max===null || parseFloat(inp.value)>max)){
+      inp.value = max===null ? "" : max;
+    }
+  });
+  recalcExam(kind,sem);
+}
+
+function recalcExam(kind,sem){
+  const p = kind+sem;
+  let maxTotal = 0;
+  document.querySelectorAll(`#${p}_table .tri-max`).forEach(function(m){
+    maxTotal += m.value!=="" ? parseFloat(m.value) : 0;
+  });
+  const mt = document.getElementById(p+"_maxTotal");
+  if(mt) mt.innerText = maxTotal;
+
+  document.querySelectorAll(`#${p}_table tbody tr[data-sr]`).forEach(function(tr){
+    let sum = 0;
+    tr.querySelectorAll(".tri-mark").forEach(function(i){
+      sum += i.value!=="" ? parseFloat(i.value) : 0;
+    });
+    tr.querySelector(".tri-rowtotal").innerText = sum;
+  });
+}
+
+function examDocRef(kind,sem,subjectId){
+  return db.collection("students").doc(currentUser.uid)
+    .collection("classes").doc(selectedStandard+"_"+selectedDivision)
+    .collection("marks").doc("sem"+sem+"_"+EXAM_KINDS[kind].doc+"_"+subjectId);
+}
+
+async function saveExam(kind,sem){
+  const p = kind+sem;
+  const subjectId = document.getElementById(p+"_subject").value;
+  const status = document.getElementById(p+"_status");
+  if(!subjectId) return;
+
+  const maxMarks = [];
+  document.querySelectorAll(`#${p}_table .tri-max`).forEach(function(m){
+    maxMarks.push(m.value!=="" ? parseFloat(m.value) : 0);
+  });
+
+  const marks = {};
+  document.querySelectorAll(`#${p}_table tbody tr[data-sr]`).forEach(function(tr){
+    const arr = [];
+    let total = 0;
+    tr.querySelectorAll(".tri-mark").forEach(function(i){
+      const v = i.value!=="" ? parseFloat(i.value) : null;
+      arr.push(v); total += v||0;
+    });
+    marks[tr.dataset.sr] = {name:tr.dataset.name, marks:arr, total:total};
+  });
+
+  try{
+    showLoading(true);
+    await examDocRef(kind,sem,subjectId).set({
+      semester:sem,
+      subject:subjectId,
+      qCount:maxMarks.length,
+      maxMarks:maxMarks,
+      maxTotal:maxMarks.reduce((a,b)=>a+b,0),
+      marks:marks,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    status.style.color="green";
+    status.innerText="ગુણ સફળતાપૂર્વક સાચવાઈ ગયા.";
+  }catch(e){
+    status.style.color="red";
+    status.innerText=firebaseError(e);
+  }finally{
+    showLoading(false);
+  }
+}
+
+
+/* =========================================================
+   REPORT (PDF / EXCEL / PRINT) - A4 FIT TO PAGE
+   p = "tri1" / "tri2" / "sat1" / "sat2" / "swa1" / "swa2"
+========================================================= */
+
+function getReportData(p){
+  const kind = p.slice(0,3);
+  const sem = p.slice(3);
+  const subSel = document.getElementById(p+"_subject");
+  const box = document.getElementById(p+"_table");
+
+  if(!subSel || !subSel.value || !box || !box.querySelector("table")){
+    alert("પહેલા વિષય પસંદ કરી ગુણ દાખલ કરો.");
+    return null;
+  }
+
+  const subject = TRI_SUBJECTS.find(function(x){return x.id===subSel.value;});
+  const label = kind==="swa" ? "સ્વ અધ્યયન" : EXAM_KINDS[kind].label;
+
+  const headers = Array.from(box.querySelectorAll("thead th")).map(function(t){
+    return t.innerText.trim();
+  });
+
+  const rows = [];
+  box.querySelectorAll("tbody tr").forEach(function(tr){
+    const ins = Array.from(tr.querySelectorAll("input")).map(function(i){
+      return i.value!=="" ? parseFloat(i.value) : "";
+    });
+    if(tr.classList.contains("tri-maxrow")){
+      const tot = tr.querySelector(".tri-total");
+      rows.push({max:true, cells:["પ્રશ્નના કુલ ગુણ"].concat(ins, [tot ? Number(tot.innerText) : ""])});
+    }else{
+      const tot = tr.querySelector(".tri-rowtotal");
+      const cells = [Number(tr.dataset.sr), tr.dataset.name].concat(ins);
+      if(tot) cells.push(Number(tot.innerText));
+      rows.push({max:false, cells:cells});
+    }
+  });
+
+  return {
+    school: document.getElementById("schoolName").value.trim(),
+    info: "ધોરણ " + selectedStandard + " | વર્ગ " + selectedDivision +
+          (document.getElementById("academicYear").value ? " | વર્ષ " + document.getElementById("academicYear").value : ""),
+    title: "સેમેસ્ટર-" + sem + " " + label + " - " + subject.name,
+    headers: headers,
+    rows: rows,
+    sig: kind==="swa" ? "" : "exam",
+    landscape: false
+  };
+}
+
+function reportCSS(){
+  return `.rpt{font-family:Arial,"Noto Sans Gujarati",sans-serif;color:#000;background:#fff;display:inline-block;padding:8px}
+.rpt h2{text-align:center;margin:0 0 4px;font-size:18px;color:#000}
+.rpt .sub{text-align:center;font-size:13px;margin-bottom:6px;color:#000}
+.rpt table{border-collapse:collapse;width:auto;min-width:0;margin-top:8px}
+.rpt th,.rpt td{border:1px solid #000;padding:4px 8px;font-size:13px;text-align:center;color:#000}
+.rpt th{background:#fff;color:#000;font-weight:bold;white-space:normal;border-width:1.5px}
+.rpt td.l{text-align:left;white-space:nowrap}
+.rpt tr.mx td{background:#fff;font-weight:bold;border-bottom:2px solid #000}
+.rpt.stretch{display:block;box-sizing:border-box;padding:12px}
+.rpt.stretch h2{font-size:24px;margin-bottom:8px}
+.rpt.stretch .sub{font-size:16px;margin-bottom:8px}
+.rpt.stretch table{width:100%!important;margin-top:12px}
+.rpt.stretch th,.rpt.stretch td{font-size:16px;padding:7px 10px}
+.rpt table.pc{table-layout:fixed}
+.rpt table.pc th,.rpt table.pc td{padding:3px 4px;font-size:11px;white-space:normal;line-height:1.2;word-wrap:break-word}
+.rpt td.tt{background:#fff;font-weight:bold}
+.rpt td.gg{font-weight:bold}
+.rpt table.pc th{padding:2px;vertical-align:middle}
+.rpt table.pc td{padding:3px 2px}
+.rpt.stretch table.pc th{padding:2px}
+.rpt.stretch table.pc td{font-size:13px;padding:4px 3px}
+.rpt table.pc td.l{white-space:nowrap}` + FC_CSS;
+}
+
+function rptHead(school,plain){
+  if(plain){
+    return '<div><h2>' + escapeHtml(school || "શાળા પરિણામ પોર્ટલ") + '</h2></div>';
+  }
+  const inst = schoolExtra.institution;
+  const lg = schoolExtra.logo ? grayOf(schoolExtra.logo) : "";
+  const logo = lg
+    ? '<img src="' + lg + '" style="position:absolute;left:0;top:0;height:54px;width:auto">'
+    : '';
+  return '<div style="position:relative;min-height:' + (lg ? 54 : 0) + 'px">' + logo +
+    (inst ? '<div class="sub" style="font-weight:bold;font-size:15px">' + escapeHtml(inst) + '</div>' : '') +
+    '<h2>' + escapeHtml(school || "શાળા પરિણામ પોર્ટલ") + '</h2></div>';
+}
+
+/* ---------- 90° ફેરવેલા હેડર (ફોટો તરીકે - PDF/પ્રિન્ટ/સ્ક્રીન બધામાં સરખા) ---------- */
+
+const ROT_CACHE = {};
+
+function rotWrap(cx,text,maxW){
+  const words = String(text).split(" ");
+  const lines = [];
+  let cur = "";
+  words.forEach(function(w){
+    const t = cur ? cur + " " + w : w;
+    if(cur && cx.measureText(t).width > maxW){
+      lines.push(cur);
+      cur = w;
+    }else{
+      cur = t;
+    }
+  });
+  if(cur) lines.push(cur);
+  return lines;
+}
+
+function rotHead(text,w,h,color,bold){
+  const key = [text,w,h,color,bold ? 1 : 0].join("|");
+  if(ROT_CACHE[key]!==undefined) return ROT_CACHE[key];
+
+  let url = "";
+  try{
+    const S = 3;
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(w*S);
+    cv.height = Math.round(h*S);
+    const cx = cv.getContext("2d");
+    cx.scale(S,S);
+
+    const fam = 'Arial,"Noto Sans Gujarati",sans-serif';
+    const avail = h - 8;
+    let fs = 11;
+    let lines = [];
+    for(fs=11; fs>=6.5; fs-=0.5){
+      cx.font = (bold ? "bold " : "") + fs + "px " + fam;
+      lines = rotWrap(cx,text,avail);
+      if(lines.length*fs*1.25 <= w-2) break;
+    }
+
+    const lh = fs*1.25;
+    cx.fillStyle = color;
+    cx.textAlign = "center";
+    cx.textBaseline = "middle";
+    cx.save();
+    cx.translate(0,h);
+    cx.rotate(-Math.PI/2);
+    const y0 = (w - lines.length*lh)/2 + lh/2;
+    lines.forEach(function(ln,i){ cx.fillText(ln,h/2,y0+i*lh); });
+    cx.restore();
+
+    url = cv.toDataURL("image/png");
+  }catch(e){
+    url = "";
+  }
+  ROT_CACHE[key] = url;
+  return url;
+}
+
+function rotTh(text,w,h,color,bold){
+  const u = rotHead(text,w,h,color,bold);
+  return (u && typeof u==="string" && u.indexOf("data:image")===0)
+    ? '<img src="' + u + '" style="display:block;margin:0 auto;width:' + w + 'px;height:' + h + 'px">'
+    : escapeHtml(text);
+}
+
+/* ---------- સહી (કોષ્ટક પૂરું થાય પછી) ---------- */
+
+/* વિદ્યાર્થીનું નામ 1 જ લાઈનમાં આવે તે માટે કોલમની પહોળાઈ (px) */
+function nameColW(names,fs){
+  let mx = 0;
+  try{
+    const cx = document.createElement("canvas").getContext("2d");
+    cx.font = (fs||13) + 'px Arial,"Noto Sans Gujarati",sans-serif';
+    names.forEach(function(n){
+      const w = cx.measureText(String(n)).width;
+      if(w>mx) mx = w;
+    });
+  }catch(e){ mx = 0; }
+  if(!(mx>0)){
+    let ml = 0;
+    names.forEach(function(n){ if(String(n).length>ml) ml = String(n).length; });
+    mx = ml * 8.2 * (fs||13) / 13;
+  }
+  return Math.min(360,Math.max(120,Math.ceil(mx)+18));
+}
+
+function sigFooterHTML(mode){
+  if(mode==="exam"){
+    return '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-top:34px;font-size:14px;color:#000">' +
+      '<div><div>ઉત્તરવહી તપાસનારની સહી: ______________________</div>' +
+      '<div style="margin-top:26px">ચકાસણી કરનારની સહી: ______________________</div></div>' +
+      '<div>આચાર્યની સહી: ______________________</div></div>';
+  }
+  if(mode==="class"){
+    return '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-top:34px;font-size:14px;color:#000">' +
+      '<div>વર્ગ શિક્ષકની સહી: ______________________</div>' +
+      '<div>આચાર્યની સહી: ______________________</div></div>';
+  }
+  return "";
+}
+
+function buildReportHTML(d,from,to,ci,cn){
+  const stud = d.rows.filter(function(r){ return !r.max; });
+  const maxRows = d.rows.filter(function(r){ return r.max; });
+  const f = from || 0;
+  const t = (to===undefined) ? stud.length : to;
+  const rows = maxRows.concat(stud.slice(f,t));
+  const info = d.info + (cn>1 ? " | પેજ " + (ci+1) + "/" + cn : "");
+
+  // બધા વિષયના રિપોર્ટમાં વિષયની કોલમ એકસરખી સાઈઝની (લખાણ wrap થાય)
+  let tblOpen = '<table>';
+  if(d.equalW){
+    const cnt = d.headers.length;
+    const nw = nameColW(stud.map(function(r){ return String(r.cells[1]||""); }),13);
+    let cg = '<colgroup><col style="width:44px"><col style="width:' + nw + 'px">';
+    for(let i=2;i<cnt;i++) cg += '<col style="width:' + d.equalW + 'px">';
+    cg += '</colgroup>';
+    tblOpen = '<table style="table-layout:fixed;width:' + (44 + nw + (cnt-2)*d.equalW) + 'px">' + cg;
+  }
+
+  let h = '<div class="rpt">' + rptHead(d.school) +
+    '<div class="sub"><b>' + escapeHtml(d.title) + '</b></div>' +
+    '<div class="sub">' + escapeHtml(info) + '</div>' +
+    tblOpen + '<thead><tr>';
+
+  d.headers.forEach(function(x){ h += '<th>' + escapeHtml(x) + '</th>'; });
+  h += '</tr></thead><tbody>';
+
+  rows.forEach(function(r){
+    if(r.max){
+      h += '<tr class="mx"><td colspan="2">' + escapeHtml(r.cells[0]) + '</td>';
+      r.cells.slice(1).forEach(function(c){ h += '<td>' + c + '</td>'; });
+    }else{
+      h += '<tr><td>' + r.cells[0] + '</td><td class="l">' + escapeHtml(r.cells[1]) + '</td>';
+      r.cells.slice(2).forEach(function(c){ h += '<td>' + c + '</td>'; });
+    }
+    h += '</tr>';
+  });
+
+  h += '</tbody></table>' + sigFooterHTML(d.sig) + '</div>';
+  return h;
+}
+
+/* ---------- 1 પેજમાં કેટલા વિદ્યાર્થી (30 થી વધુ હોય ત્યારે પૂછે) ---------- */
+
+function reportCount(d){
+  return d.pages ? PC.students.length : (d.pb ? students.length : (d.fcards ? PC.students.length : d.rows.filter(function(r){ return !r.max; }).length));
+}
+
+function reportChunks(count,per){
+  if(!per || per>=count) return [[0,count]];
+  const out = [];
+  for(let i=0;i<count;i+=per) out.push([i,Math.min(count,i+per)]);
+  return out;
+}
+
+function askPerPage(count,at,def){
+  at = at || 30;
+  def = def || 30;
+  return new Promise(function(resolve){
+    if(count<=at){ resolve(count); return; }
+
+    const ov = document.createElement("div");
+    ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px";
+    ov.innerHTML =
+      '<div style="background:#fff;border-radius:18px;padding:22px;max-width:380px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.4)">' +
+        '<div style="font-weight:bold;font-size:18px;color:#202d71;margin-bottom:6px">1 પેજ માં કેટલા વિદ્યાર્થીની લેવા માંગો છો?</div>' +
+        '<div style="font-size:14px;color:#555;margin-bottom:10px">કુલ ' + count + ' વિદ્યાર્થી છે. બાકી વધે તે બીજા પેજ પર આવશે.</div>' +
+        '<input type="number" id="perPageInput" min="1" max="' + count + '" value="' + Math.min(def,count) + '">' +
+        '<div id="perPageErr" style="color:#b51d1d;font-size:14px;margin-top:6px;min-height:18px"></div>' +
+        '<div style="display:flex;gap:10px;margin-top:8px">' +
+          '<button id="ppOk" class="primary-btn" style="margin-top:0">ઠીક છે</button>' +
+          '<button id="ppCancel" class="gray-btn" style="margin-top:0">રદ</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+
+    const inp = ov.querySelector("#perPageInput");
+    inp.focus();
+
+    ov.querySelector("#ppOk").onclick = function(){
+      const v = parseInt(inp.value);
+      if(!v || v<1){
+        ov.querySelector("#perPageErr").innerText = "1 કે તેથી વધુ સંખ્યા લખો.";
+        return;
+      }
+      ov.remove();
+      resolve(v>=count ? count : v);
+    };
+    ov.querySelector("#ppCancel").onclick = function(){
+      ov.remove();
+      resolve(null);
+    };
+  });
+}
+
+function reportBodies(d,per){
+  const chunks = reportChunks(reportCount(d),per);
+  const out = [];
+  chunks.forEach(function(ch,ci){
+    if(d.pages){
+      d.pages.forEach(function(p,pi){
+        out.push(pcPageHTML(d,p,pi,ch[0],ch[1],ci,chunks.length));
+      });
+    }else if(d.fcards){
+      for(let k=ch[0];k<ch[1];k+=2) out.push(fcPageHTML(k,Math.min(ch[1],k+2)));
+    }else if(d.pb){
+      out.push(pbPageHTML(d,ch[0],ch[1],ci,chunks.length));
+    }else{
+      out.push(buildReportHTML(d,ch[0],ch[1],ci,chunks.length));
+    }
+  });
+  return out;
+}
+
+function reportFileName(d,ext){
+  return ((d.fileTitle || d.title) + "_" + selectedStandard + selectedDivision)
+    .replace(/[\\\/:*?"<>|]/g,"")
+    .replace(/\s+/g,"_") + "." + ext;
+}
+
+/* ---------- A4 FIT ---------- */
+
+function reportAvail(d){
+  // A4 માં 10mm margin પછી વાપરી શકાય તેવી જગ્યા (96dpi px)
+  return d.landscape ? {w:1047,h:718} : {w:718,h:1047};
+}
+
+/* ખાના ઓછા હોય તો પહોળાઈ A4 જેટલી ભરી દે (મોટું અને સુંદર),
+   ખાના/વિદ્યાર્થી વધુ હોય તો A4 માં ફિટ થાય તેટલું નાનું કરે */
+function fitReport(rpt,av){
+  let w = rpt.offsetWidth;
+  if(w < av.w){
+    rpt.classList.add("stretch");
+    rpt.style.width = av.w + "px";
+    w = av.w;
+  }
+  const h = rpt.offsetHeight;
+  const scale = Math.min(1, av.w/w, av.h/h) * 0.98;
+  return {w:w, h:h, scale:scale};
+}
+
+/* ---------- PRINT (A4, fit to page) ---------- */
+
+async function printReport(src){
+  const d = typeof src==="string" ? getReportData(src) : src;
+  if(!d) return;
+
+  const per = await askPerPage(reportCount(d),d.popupAt,d.defPer);
+  if(per===null) return;
+  await warmGray(allImgUrls());
+
+  const orient = d.landscape ? "landscape" : "portrait";
+  const av = reportAvail(d);
+  const bodies = reportBodies(d,per);
+
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "position:fixed;left:-10000px;top:0;width:1400px;height:1400px;border:0;";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>${escapeHtml(d.title)}</title>
+    <style>
+      @page{size:A4 ${orient};margin:10mm}
+      *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      html,body{margin:0;padding:0;background:#fff}
+      .pgb{overflow:hidden;margin:0 auto;page-break-after:always;break-after:page}
+      .pgb:last-child{page-break-after:auto;break-after:auto}
+      .fitw{transform-origin:top left;display:block}
+      ${reportCSS()}
+    </style></head><body>
+    ${bodies.map(function(b){ return '<div class="pgb"><div class="fitw">' + b + '</div></div>'; }).join("")}
+    </body></html>`);
+  doc.close();
+
+  setTimeout(function(){
+    try{
+      doc.querySelectorAll(".pgb").forEach(function(pg){
+        const rpt = pg.querySelector(".rpt");
+        const f = fitReport(rpt,av);
+        pg.querySelector(".fitw").style.transform = "scale(" + f.scale + ")";
+        pg.style.width = Math.ceil(f.w*f.scale) + "px";
+        pg.style.height = Math.ceil(f.h*f.scale) + "px";
+      });
+
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    }catch(e){
+      console.error(e);
+      alert("Print માં સમસ્યા: " + e.message);
+    }
+    setTimeout(function(){ iframe.remove(); }, 60000);
+  }, 400);
+}
+
+/* ---------- PDF SAVE (A4, fit to page) ---------- */
+
+function loadScriptOnce(url){
+  return new Promise(function(resolve,reject){
+    const sc = document.createElement("script");
+    sc.src = url;
+    sc.onload = resolve;
+    sc.onerror = function(){ reject(new Error("Library લોડ થઈ નથી")); };
+    document.head.appendChild(sc);
+  });
+}
+
+async function ensurePdfLibs(){
+  if(typeof html2canvas === "undefined"){
+    await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+  }
+  if(!window.jspdf){
+    await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+  }
+}
+
+async function saveReportPdf(src){
+  const d = typeof src==="string" ? getReportData(src) : src;
+  if(!d) return;
+
+  const per = await askPerPage(reportCount(d),d.popupAt,d.defPer);
+  if(per===null) return;
+  await warmGray(allImgUrls());
+
+  try{
+    showLoading(true);
+    await ensurePdfLibs();
+  }catch(e){
+    showLoading(false);
+    alert("PDF Library લોડ થઈ નથી. Internet ચાલુ રાખો અને ફરી પ્રયાસ કરો.");
+    return;
+  }
+
+  const bodies = reportBodies(d,per);
+
+  const holder = document.createElement("div");
+  holder.style.cssText = "position:fixed;left:-10000px;top:0;width:max-content;background:#fff;z-index:-1";
+  document.body.appendChild(holder);
+
+  try{
+    const pdf = new window.jspdf.jsPDF({
+      orientation:d.landscape ? "l" : "p",
+      unit:"mm",
+      format:"a4"
+    });
+
+    const pw = pdf.internal.pageSize.getWidth();
+    const ph = pdf.internal.pageSize.getHeight();
+    const aw = pw - 20;
+    const ah = ph - 20;
+    const SC = 3;
+
+    for(let i=0;i<bodies.length;i++){
+      holder.innerHTML = "<style>" + reportCSS() + "</style>" + bodies[i];
+      await new Promise(function(r){ setTimeout(r,250); });
+
+      const rpt = holder.querySelector(".rpt");
+      fitReport(rpt, reportAvail(d));
+
+      const canvas = await html2canvas(rpt, {
+        scale:SC,
+        backgroundColor:"#ffffff"
+      });
+
+      const nw = canvas.width/SC*25.4/96;
+      const nh = canvas.height/SC*25.4/96;
+      const k = Math.min(1, aw/nw, ah/nh);
+      const w = nw*k;
+      const h = nh*k;
+
+      if(i>0) pdf.addPage();
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", (pw-w)/2, 10, w, h);
+    }
+
+    pdf.save(reportFileName(d,"pdf"));
+  }catch(e){
+    console.error(e);
+    alert("PDF બનાવવામાં સમસ્યા: " + e.message);
+  }finally{
+    holder.remove();
+    showLoading(false);
+  }
+}
+
+/* ---------- EXCEL EXPORT (A4, fit to 1 page) ---------- */
+
+/* Excel: ઉપરના શીર્ષક (સંસ્થા, શાળા, લોગો...) - આગળ હેડર ક્યાંથી શરૂ થાય તે હરોળ આપે */
+function xlTitles(ws,wb,d,n){
+  const lines = [];
+  if(schoolExtra.institution && !d.plain) lines.push([schoolExtra.institution,13]);
+  lines.push([d.school || "શાળા પરિણામ પોર્ટલ",16]);
+  lines.push([d.title,13]);
+  lines.push([d.info,11]);
+  if(d.info2) lines.push([d.info2,10]);
+
+  lines.forEach(function(t,i){
+    const r = i+1;
+    ws.mergeCells(r,1,r,n);
+    const c = ws.getCell(r,1);
+    c.value = t[0];
+    c.font = {bold:true,size:t[1]};
+    c.alignment = {horizontal:"center",vertical:"middle"};
+    ws.getRow(r).height = Math.max(20,t[1]+8);
+  });
+
+  if(schoolExtra.logo && !d.plain){
+    try{
+      const lg = grayOf(schoolExtra.logo);
+      const m = lg.match(/^data:image\/(png|jpeg|jpg);base64,/);
+      const ext = m ? (m[1]==="jpg" ? "jpeg" : m[1]) : "png";
+      const id = wb.addImage({base64:lg, extension:ext});
+      ws.addImage(id,{tl:{col:0.1,row:0.1},ext:{width:58,height:58}});
+    }catch(e){ console.log("Logo error",e); }
+  }
+
+  return lines.length + 2;
+}
+
+async function exportReportExcel(src){
+  const d = typeof src==="string" ? getReportData(src) : src;
+  if(!d) return;
+
+  if(typeof ExcelJS === "undefined"){
+    alert("Excel Library લોડ થઈ નથી. Internet ચાલુ રાખો અને ફરી પ્રયાસ કરો.");
+    return;
+  }
+
+  await warmGray(allImgUrls());
+
+  if(d.fcards){
+    return exportPatrakFExcel(d);
+  }
+  if(d.pb){
+    return exportPatrakBExcel(d);
+  }
+  if(d.pages){
+    return exportPatrakExcel(d);
+  }
+
+  try{
+    const hn = d.headers.length;
+    const n = hn;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("ગુણ");
+
+    const thin = {style:"thin"};
+    const border = {top:thin,left:thin,bottom:thin,right:thin};
+
+    const hr = xlTitles(ws,wb,d,n);
+
+    // Header
+    const hrow = ws.getRow(hr);
+    hrow.height = 34;
+    d.headers.forEach(function(x,i){
+      const c = hrow.getCell(i+1);
+      c.value = x;
+      c.font = {bold:true};
+      c.alignment = {horizontal:"center",vertical:"middle",wrapText:true};
+      c.border = border;
+    });
+
+    // Rows
+    let rowNo = hr + 1;
+    d.rows.forEach(function(r){
+      const row = ws.getRow(rowNo);
+      row.height = 20;
+      if(r.max){
+        ws.mergeCells(rowNo,1,rowNo,2);
+        row.getCell(1).value = r.cells[0];
+        r.cells.slice(1).forEach(function(c,i){ row.getCell(i+3).value = c; });
+      }else{
+        r.cells.forEach(function(c,i){ row.getCell(i+1).value = c; });
+      }
+      for(let i=1;i<=n;i++){
+        const c = row.getCell(i);
+        c.border = border;
+        c.alignment = {horizontal:(i===2 && !r.max)?"left":"center",vertical:"middle"};
+        if(r.max){
+          c.font = {bold:true};
+        }
+      }
+      rowNo++;
+    });
+    const lastBody = rowNo - 1;
+
+    // સહી (કોષ્ટક પૂરું થાય પછી)
+    if(d.sig==="exam" && n>=4){
+      const fr = lastBody + 3;
+      const L = Math.max(2,Math.floor(n/2));
+
+      ws.mergeCells(fr,1,fr,L);
+      const c1 = ws.getCell(fr,1);
+      c1.value = "ઉત્તરવહી તપાસનારની સહી: ____________________";
+      c1.font = {bold:true};
+      c1.alignment = {horizontal:"left",vertical:"middle"};
+
+      ws.mergeCells(fr+2,1,fr+2,L);
+      const c2 = ws.getCell(fr+2,1);
+      c2.value = "ચકાસણી કરનારની સહી: ____________________";
+      c2.font = {bold:true};
+      c2.alignment = {horizontal:"left",vertical:"middle"};
+
+      ws.mergeCells(fr,L+1,fr,n);
+      const c3 = ws.getCell(fr,L+1);
+      c3.value = "આચાર્યની સહી: ____________________";
+      c3.font = {bold:true};
+      c3.alignment = {horizontal:"right",vertical:"middle"};
+
+      ws.getRow(fr).height = 24;
+      ws.getRow(fr+2).height = 24;
+    }
+
+    // ખાના ઓછા હોય તો કોલમ પહોળી કરો જેથી A4 પર મોટું અને સરસ દેખાય
+    const otherW = hn>2 ? Math.min(35, Math.max(11, Math.floor(62/(hn-2)))) : 11;
+    ws.getColumn(1).width = 8;
+    const nmW = nameColW(d.rows.filter(function(r){ return !r.max; }).map(function(r){ return String(r.cells[1]||""); }),13);
+    ws.getColumn(2).width = Math.min(60,Math.max(30,Math.round(nmW/6.2)));
+    for(let i=3;i<=hn;i++) ws.getColumn(i).width = otherW;
+
+    // A4 + Portrait + Fit to page
+    ws.pageSetup = {
+      paperSize:9,
+      orientation:"portrait",
+      fitToPage:true,
+      fitToWidth:1,
+      fitToHeight:1,
+      horizontalCentered:true,
+      margins:{left:0.4,right:0.4,top:0.5,bottom:0.5,header:0.3,footer:0.3}
+    };
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer],{
+      type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = reportFileName(d,"xlsx");
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }catch(e){
+    console.error(e);
+    alert("Excel Exportમાં સમસ્યા:\n" + e.message);
+  }
+}
+
+
+/* =========================================================
+   SWA ADHYAYAN
+========================================================= */
+
+const SWA_MAX = 20;
+
+function renderSwaForm(sem){
+  const box = document.getElementById("swa-sem"+sem);
+  if(!selectedStandard || !selectedDivision){
+    box.innerHTML = '<div class="info-box">પહેલા મુખ્ય પેજ પરથી ધોરણ અને વર્ગ પસંદ કરો.</div>';
+    return;
+  }
+  const cls = selectedStandard+"_"+selectedDivision;
+  if(box.dataset.cls===cls && box.querySelector("#swa"+sem+"_subject")) return;
+  box.dataset.cls = cls;
+
+  box.innerHTML = `
+    <div>
+      <label>વિષય</label>
+      <select id="swa${sem}_subject" onchange="createSwaTable(${sem})">
+        <option value="">-- વિષય પસંદ કરો --</option>
+        ${TRI_SUBJECTS.map(s=>`<option value="${s.id}">${s.name}</option>`).join("")}
+      </select>
+    </div>
+    <div id="swa${sem}_table" style="margin-top:15px"></div>
+    <div id="swa${sem}_status" class="status"></div>
+
+    <div style="margin-top:25px;border-top:2px solid #ddd;padding-top:15px">
+      <h3 style="color:#202d71;margin:0 0 5px">📑 બધા વિષય એક જ પેજમાં</h3>
+      <div style="color:#555;font-size:14px;margin-bottom:8px">સાચવેલા બધા વિષયના ગુણ એક જ A4 પેજમાં.</div>
+      <div class="export-bar">
+        <button class="action-btn pdf" onclick="swaAll(${sem},'pdf')">📄 PDF સેવ</button>
+        <button class="action-btn excel" onclick="swaAll(${sem},'excel')">📊 Excel Export</button>
+        <button class="action-btn print" onclick="swaAll(${sem},'print')">🖨️ પ્રિન્ટ</button>
+      </div>
+    </div>
+  `;
+}
+
+async function createSwaTable(sem){
+  const subjectId = document.getElementById("swa"+sem+"_subject").value;
+  const status = document.getElementById("swa"+sem+"_status");
+  const tableBox = document.getElementById("swa"+sem+"_table");
+  status.style.color="red"; status.innerText="";
+  tableBox.innerHTML = "";
+
+  if(!subjectId) return;
+  if(students.length===0){ alert("પહેલા વિદ્યાર્થીની માહિતી સાચવો."); return; }
+
+  let saved = null;
+  try{
+    showLoading(true);
+    const snap = await swaDocRef(sem,subjectId).get();
+    if(snap.exists) saved = snap.data();
+  }catch(e){ console.log(e); }
+  finally{ showLoading(false); }
+
+  let html = `<div class="table-wrap"><table class="tri-table swa-table"><thead><tr>
+      <th>ક્રમ</th><th>વિદ્યાર્થીનું નામ</th><th>ગુણ (${SWA_MAX})</th>
+    </tr></thead><tbody>`;
+
+  students.forEach(function(st){
+    const sv = saved && saved.marks && saved.marks[st.srNo] ? saved.marks[st.srNo].mark : null;
+    const v = sv!==null && sv!==undefined ? sv : "";
+    html += `<tr data-sr="${st.srNo}" data-name="${escapeHtml(st.name||"")}">
+      <td>${st.srNo}</td>
+      <td class="tri-name">${escapeHtml(st.name||"")}</td>
+      <td><input type="number" min="0" max="${SWA_MAX}" step="0.5" class="swa-mark" value="${v}" oninput="onSwaInput(this,${sem})"></td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>
+    <button class="save-btn" onclick="saveSwa(${sem})">💾 ગુણ સાચવો</button>
+    ${exportBar("swa"+sem)}`;
+
+  tableBox.innerHTML = html;
+}
+
+function onSwaInput(input,sem){
+  const status = document.getElementById("swa"+sem+"_status");
+  if(input.value!=="" && parseFloat(input.value) > SWA_MAX){
+    input.value = SWA_MAX;
+    status.style.color="red";
+    status.innerText = "સ્વ અધ્યયનના ગુણ "+SWA_MAX+" કરતા વધુ ન લખાય.";
+  }else if(input.value!=="" && parseFloat(input.value) < 0){
+    input.value = 0;
+  }else{
+    status.innerText = "";
+  }
+}
+
+function swaDocRef(sem,subjectId){
+  return db.collection("students").doc(currentUser.uid)
+    .collection("classes").doc(selectedStandard+"_"+selectedDivision)
+    .collection("marks").doc("sem"+sem+"_swa_"+subjectId);
+}
+
+async function saveSwa(sem){
+  const subjectId = document.getElementById("swa"+sem+"_subject").value;
+  const status = document.getElementById("swa"+sem+"_status");
+  if(!subjectId) return;
+
+  const marks = {};
+  document.querySelectorAll(`#swa${sem}_table tbody tr[data-sr]`).forEach(function(tr){
+    const i = tr.querySelector(".swa-mark");
+    marks[tr.dataset.sr] = {
+      name:tr.dataset.name,
+      mark:i.value!=="" ? parseFloat(i.value) : null
+    };
+  });
+
+  try{
+    showLoading(true);
+    await swaDocRef(sem,subjectId).set({
+      semester:sem,
+      subject:subjectId,
+      maxMark:SWA_MAX,
+      marks:marks,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    status.style.color="green";
+    status.innerText="ગુણ સફળતાપૂર્વક સાચવાઈ ગયા.";
+  }catch(e){
+    status.style.color="red";
+    status.innerText=firebaseError(e);
+  }finally{
+    showLoading(false);
+  }
+}
+
+/* =========================================================
+   SWA ADHYAYAN - બધા વિષય એક જ પેજમાં
+========================================================= */
+
+async function getSwaAllData(sem){
+  if(!selectedStandard || !selectedDivision){
+    alert("પહેલા મુખ્ય પેજ પરથી ધોરણ અને વર્ગ પસંદ કરો.");
+    return null;
+  }
+  if(students.length===0){
+    alert("પહેલા વિદ્યાર્થીની માહિતી સાચવો.");
+    return null;
+  }
+
+  let snaps;
+  try{
+    showLoading(true);
+    snaps = await Promise.all(TRI_SUBJECTS.map(function(sb){
+      return swaDocRef(sem,sb.id).get();
+    }));
+  }catch(e){
+    alert(firebaseError(e));
+    return null;
+  }finally{
+    showLoading(false);
+  }
+
+  const saved = snaps.map(function(sn){ return sn.exists ? sn.data() : null; });
+
+  if(!saved.some(function(x){ return x; })){
+    alert("હજી કોઈ વિષયના ગુણ સાચવ્યા નથી.");
+    return null;
+  }
+
+  const rows = students.map(function(st){
+    const cells = [Number(st.srNo), st.name || ""];
+    saved.forEach(function(sv){
+      const m = sv && sv.marks && sv.marks[st.srNo] ? sv.marks[st.srNo].mark : null;
+      cells.push(m!==null && m!==undefined ? m : "");
+    });
+    return {max:false, cells:cells};
+  });
+
+  const year = document.getElementById("academicYear").value;
+
+  return {
+    school: document.getElementById("schoolName").value.trim(),
+    info: "ધોરણ " + selectedStandard + " | વર્ગ " + selectedDivision +
+          (year ? " | વર્ષ " + year : "") +
+          " | દરેક વિષય " + SWA_MAX + " માંથી",
+    title: "સેમેસ્ટર-" + sem + " સ્વ અધ્યયન",
+    equalW: 74,
+    headers: ["ક્રમ","વિદ્યાર્થીનું નામ"].concat(TRI_SUBJECTS.map(function(sb){ return sb.name; })),
+    rows: rows,
+    landscape: false
+  };
+}
+
+async function swaAll(sem,action){
+  const d = await getSwaAllData(sem);
+  if(!d) return;
+
+  if(action==="pdf") saveReportPdf(d);
+  else if(action==="excel") exportReportExcel(d);
+  else printReport(d);
+}
+
+/* =========================================================
+   TRIMASIK / SATRANT - બધા વિષય એક જ પેજમાં
+   (વિષય મુજબ કુલ ગુણ + કુલ + ટકા + ક્રમાંક)
+========================================================= */
+
+async function getExamAllData(kind,sem){
+  if(!selectedStandard || !selectedDivision){
+    alert("પહેલા મુખ્ય પેજ પરથી ધોરણ અને વર્ગ પસંદ કરો.");
+    return null;
+  }
+  if(students.length===0){
+    alert("પહેલા વિદ્યાર્થીની માહિતી સાચવો.");
+    return null;
+  }
+
+  let snaps;
+  try{
+    showLoading(true);
+    snaps = await Promise.all(TRI_SUBJECTS.map(function(sb){
+      return examDocRef(kind,sem,sb.id).get();
+    }));
+  }catch(e){
+    alert(firebaseError(e));
+    return null;
+  }finally{
+    showLoading(false);
+  }
+
+  // જે વિષયના ગુણ સાચવેલા છે તે જ લેવા
+  const subs = [];
+  TRI_SUBJECTS.forEach(function(sb,i){
+    if(snaps[i].exists){
+      const dta = snaps[i].data();
+      const maxT = (typeof dta.maxTotal==="number")
+        ? dta.maxTotal
+        : (dta.maxMarks||[]).reduce(function(a,b){return a+b;},0);
+      subs.push({name:sb.name, data:dta, max:maxT});
+    }
+  });
+
+  if(subs.length===0){
+    alert("હજી કોઈ વિષયના ગુણ સાચવ્યા નથી.");
+    return null;
+  }
+
+  const sumMax = subs.reduce(function(a,x){ return a + x.max; }, 0);
+
+  // દરેક વિદ્યાર્થીના વિષય મુજબ, કુલ અને ટકા
+  const list = students.map(function(st){
+    let total = 0;
+    let hasAny = false;
+    const cells = subs.map(function(sb){
+      const rec = sb.data.marks && sb.data.marks[st.srNo] ? sb.data.marks[st.srNo] : null;
+      const entered = rec && Array.isArray(rec.marks) && rec.marks.some(function(v){ return v!==null && v!==undefined; });
+      if(!entered) return "";
+      hasAny = true;
+      const t = typeof rec.total==="number"
+        ? rec.total
+        : rec.marks.reduce(function(a,v){ return a + (v||0); }, 0);
+      total += t;
+      return t;
+    });
+    const percent = sumMax>0 && hasAny ? Number((total/sumMax*100).toFixed(2)) : "";
+    return {st:st, cells:cells, total:hasAny ? total : "", percent:percent, hasAny:hasAny};
+  });
+
+  // ક્રમાંક (સરખા ગુણ હોય તો સરખો ક્રમાંક)
+  const ranked = list.filter(function(x){ return x.hasAny; })
+                     .map(function(x){ return x.total; })
+                     .sort(function(a,b){ return b-a; });
+
+  const rows = [];
+
+  rows.push({
+    max:true,
+    cells:["વિષયના કુલ ગુણ"].concat(
+      subs.map(function(x){ return x.max; }),
+      [sumMax, "", ""]
+    )
+  });
+
+  list.forEach(function(x){
+    const rank = x.hasAny ? ranked.indexOf(x.total) + 1 : "";
+    rows.push({
+      max:false,
+      cells:[Number(x.st.srNo), x.st.name || ""].concat(x.cells, [x.total, x.percent, rank])
+    });
+  });
+
+  const year = document.getElementById("academicYear").value;
+  const headers = ["ક્રમ","વિદ્યાર્થીનું નામ"]
+    .concat(subs.map(function(x){ return x.name; }), ["કુલ ગુણ","ટકા (%)","ક્રમાંક"]);
+
+  return {
+    school: document.getElementById("schoolName").value.trim(),
+    info: "ધોરણ " + selectedStandard + " | વર્ગ " + selectedDivision +
+          (year ? " | વર્ષ " + year : ""),
+    title: "સેમેસ્ટર-" + sem + " " + EXAM_KINDS[kind].label,
+    equalW: 74,
+    headers: headers,
+    rows: rows,
+    landscape: false
+  };
+}
+
+async function examAll(kind,sem,action){
+  const d = await getExamAllData(kind,sem);
+  if(!d) return;
+
+  if(action==="pdf") saveReportPdf(d);
+  else if(action==="excel") exportReportExcel(d);
+  else printReport(d);
+}
+
+/* =========================================================
+   શાળાની વધારાની વિગત (લોગો, સંસ્થા, તારીખો)
+========================================================= */
+
+function readSchoolExtra(){
+  const g = function(id){ const el = document.getElementById(id); return el ? el.value : ""; };
+  schoolExtra.institution = g("institutionName").trim();
+  schoolExtra.sem1ResultDate = g("sem1ResultDate");
+  schoolExtra.sem2ResultDate = g("sem2ResultDate");
+  schoolExtra.diwaliFrom = g("diwaliFrom");
+  schoolExtra.diwaliTo = g("diwaliTo");
+  schoolExtra.summerFrom = g("summerFrom");
+  schoolExtra.summerTo = g("summerTo");
+  return {
+    institution:schoolExtra.institution,
+    logo:schoolExtra.logo || "",
+    sem1ResultDate:schoolExtra.sem1ResultDate,
+    sem2ResultDate:schoolExtra.sem2ResultDate,
+    diwaliFrom:schoolExtra.diwaliFrom,
+    diwaliTo:schoolExtra.diwaliTo,
+    summerFrom:schoolExtra.summerFrom,
+    summerTo:schoolExtra.summerTo
+  };
+}
+
+function applySchoolExtra(data){
+  const set = function(id,v){ const el = document.getElementById(id); if(el) el.value = v || ""; };
+  schoolExtra.institution = data.institution || "";
+  schoolExtra.logo = data.logo || "";
+  schoolExtra.sem1ResultDate = data.sem1ResultDate || "";
+  schoolExtra.sem2ResultDate = data.sem2ResultDate || "";
+  schoolExtra.diwaliFrom = data.diwaliFrom || "";
+  schoolExtra.diwaliTo = data.diwaliTo || "";
+  schoolExtra.summerFrom = data.summerFrom || "";
+  schoolExtra.summerTo = data.summerTo || "";
+
+  set("institutionName",schoolExtra.institution);
+  set("sem1ResultDate",schoolExtra.sem1ResultDate);
+  set("sem2ResultDate",schoolExtra.sem2ResultDate);
+  set("diwaliFrom",schoolExtra.diwaliFrom);
+  set("diwaliTo",schoolExtra.diwaliTo);
+  set("summerFrom",schoolExtra.summerFrom);
+  set("summerTo",schoolExtra.summerTo);
+  renderLogoPreview();
+}
+
+function onLogoSelect(ev){
+  const f = ev.target.files[0];
+  if(!f) return;
+  if(!/^image\//.test(f.type)){
+    alert("ફક્ત ફોટો (PNG / JPEG) પસંદ કરો.");
+    ev.target.value = "";
+    return;
+  }
+
+  const rd = new FileReader();
+  rd.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      // નાનો કરીને સાચવવો (Firestore માટે)
+      const M = 300;
+      const r = Math.min(1, M/Math.max(img.width,img.height));
+      const w = Math.max(1,Math.round(img.width*r));
+      const h = Math.max(1,Math.round(img.height*r));
+      const cv = document.createElement("canvas");
+      cv.width = w;
+      cv.height = h;
+      cv.getContext("2d").drawImage(img,0,0,w,h);
+      schoolExtra.logo = f.type==="image/jpeg" ? cv.toDataURL("image/jpeg",0.9) : cv.toDataURL("image/png");
+      renderLogoPreview();
+    };
+    img.onerror = function(){ alert("ફોટો ખૂલી શક્યો નથી."); };
+    img.src = e.target.result;
+  };
+  rd.readAsDataURL(f);
+  ev.target.value = "";
+}
+
+function renderLogoPreview(){
+  const box = document.getElementById("logoPreviewBox");
+  if(!box) return;
+  box.innerHTML = schoolExtra.logo
+    ? '<img src="' + schoolExtra.logo + '" style="height:70px;max-width:200px;object-fit:contain;border:1px solid #ccc;border-radius:8px;padding:4px;vertical-align:middle"> ' +
+      '<button class="delete-btn" style="margin-left:8px" onclick="removeLogo()">લોગો કાઢો</button>' +
+      '<div style="font-size:13px;color:#555;margin-top:4px">"શાળાની વિગત સાચવો" દબાવો ત્યારે લોગો સચવાશે.</div>'
+    : '';
+}
+
+function removeLogo(){
+  schoolExtra.logo = "";
+  renderLogoPreview();
+}
+
+function fmtDate(v){
+  const m = String(v||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? m[3] + "/" + m[2] + "/" + m[1] : "";
+}
+
+function vacText(a,b){
+  const x = fmtDate(a);
+  const y = fmtDate(b);
+  if(x && y) return x + " થી " + y;
+  if(x) return x + " થી";
+  if(y) return y + " સુધી";
+  return "";
+}
+
+function pcInfo2(sem){
+  const e = schoolExtra;
+  const parts = [];
+  const rd = fmtDate(sem===2 ? e.sem2ResultDate : e.sem1ResultDate);
+  if(rd) parts.push("સેમેસ્ટર-" + sem + " પરિણામ તારીખ: " + rd);
+  const dv = vacText(e.diwaliFrom,e.diwaliTo);
+  if(dv) parts.push("દિવાળી વેકેશન: " + dv);
+  const sv = vacText(e.summerFrom,e.summerTo);
+  if(sv) parts.push("ઉનાળુ વેકેશન: " + sv);
+  return parts.join(" | ");
+}
+
+
+/* =========================================================
+   હાજરી (સેમેસ્ટર-1 / સેમેસ્ટર-2)
+========================================================= */
+
+function attRef(sem){
+  return db.collection("students").doc(currentUser.uid)
+    .collection("classes").doc(selectedStandard+"_"+selectedDivision)
+    .collection("marks").doc("sem"+sem+"_attendance");
+}
+
+async function renderAttendance(sem){
+  const box = document.getElementById("att-sem"+sem);
+
+  if(!selectedStandard || !selectedDivision){
+    box.innerHTML = '<div class="info-box">પહેલા મુખ્ય પેજ પરથી ધોરણ અને વર્ગ પસંદ કરો.</div>';
+    return;
+  }
+  if(students.length===0){
+    box.innerHTML = '<div class="info-box">પહેલા વિદ્યાર્થીની માહિતી સાચવો.</div>';
+    return;
+  }
+
+  let saved = null;
+  try{
+    showLoading(true);
+    const sn = await attRef(sem).get();
+    if(sn.exists) saved = sn.data();
+  }catch(e){ console.log(e); }
+  finally{ showLoading(false); }
+
+  const days = saved && typeof saved.totalDays==="number" ? saved.totalDays : "";
+
+  let html = `
+    <div class="form-grid">
+      <div>
+        <label>કુલ દિવસો</label>
+        <input type="number" min="0" step="1" id="att${sem}_days" value="${days}" oninput="onAttDays(${sem})">
+      </div>
+    </div>
+    <div class="table-wrap" style="margin-top:15px"><table class="tri-table"><thead><tr>
+      <th>ક્રમ</th><th>વિદ્યાર્થીનું નામ</th><th>હાજરી</th>
+    </tr></thead><tbody>`;
+
+  students.forEach(function(st){
+    const v = saved && saved.att && typeof saved.att[st.srNo]==="number" ? saved.att[st.srNo] : "";
+    html += `<tr data-sr="${st.srNo}">
+      <td>${st.srNo}</td>
+      <td class="tri-name">${escapeHtml(st.name||"")}</td>
+      <td><input type="number" min="0" step="1" class="att-in" value="${v}" oninput="onAttInput(this,${sem})"></td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div>
+    <button class="save-btn" onclick="saveAttendance(${sem})">💾 હાજરી સાચવો</button>
+    <div id="att${sem}_status" class="status"></div>`;
+
+  box.innerHTML = html;
+}
+
+function onAttDays(sem){
+  const status = document.getElementById("att"+sem+"_status");
+  const days = parseInt(document.getElementById("att"+sem+"_days").value);
+  status.innerText = "";
+  if(isNaN(days)) return;
+  document.querySelectorAll("#att-sem"+sem+" .att-in").forEach(function(i){
+    if(i.value!=="" && parseInt(i.value)>days) i.value = days;
+  });
+}
+
+function onAttInput(inp,sem){
+  const status = document.getElementById("att"+sem+"_status");
+  const dv = document.getElementById("att"+sem+"_days").value;
+  status.innerText = "";
+
+  if(dv===""){
+    inp.value = "";
+    status.style.color = "red";
+    status.innerText = "પહેલા કુલ દિવસો લખો.";
+    return;
+  }
+
+  const days = parseInt(dv);
+  if(inp.value!==""){
+    const v = parseInt(inp.value);
+    if(v<0) inp.value = 0;
+    else if(v>days){
+      inp.value = days;
+      status.style.color = "red";
+      status.innerText = "હાજરી કુલ દિવસો (" + days + ") કરતા વધુ ન લખાય.";
+    }
+  }
+}
+
+async function saveAttendance(sem){
+  const status = document.getElementById("att"+sem+"_status");
+  const dv = document.getElementById("att"+sem+"_days").value;
+  if(dv===""){
+    status.style.color = "red";
+    status.innerText = "પહેલા કુલ દિવસો લખો.";
+    return;
+  }
+
+  const att = {};
+  document.querySelectorAll("#att-sem"+sem+" tbody tr[data-sr]").forEach(function(tr){
+    const i = tr.querySelector(".att-in");
+    att[tr.dataset.sr] = i.value!=="" ? parseInt(i.value) : null;
+  });
+
+  try{
+    showLoading(true);
+    await attRef(sem).set({
+      totalDays:parseInt(dv),
+      att:att,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    status.style.color = "green";
+    status.innerText = "હાજરી સફળતાપૂર્વક સાચવાઈ ગઈ.";
+  }catch(e){
+    status.style.color = "red";
+    status.innerText = firebaseError(e);
+  }finally{
+    showLoading(false);
+  }
+}
+
+
+/* =========================================================
+   PATRAK-B (વ્યક્તિત્વ વિકાસ) - 40 મુદ્દા, દરેક 10 ગુણ = 400
+   સેમેસ્ટર-1: ફક્ત પ્રથમ સત્ર | સેમેસ્ટર-2: પ્રથમ (લોક) + દ્વિતીય
+========================================================= */
+
+const PB_ITEMS = [
+  "પ્રાર્થના સભામાં નિયમિત સામેલ થાય છે.",
+  "શાળાની સ્વચ્છતા જાળવે છે.",
+  "બીજા વિદ્યાર્થીઓને મદદરૂપ થાય છે.",
+  "સોંપેલું કાર્ય સારી રીતે કરે છે.",
+  "કોઈપણ કાર્ય કરવામાં તત્પરતા દાખવે છે.",
+  "શિક્ષક પ્રત્યે આદરાત્મક વલણ દાખવે છે.",
+  "શાળા મિલકતની જાળવણી રાખે છે.",
+  "સહાધ્યાયી પ્રત્યે સહયોગ દાખવે છે.",
+  "વ્યક્તિગત સ્વચ્છતા અને સુઘડતા દાખવે છે.",
+  "પર્યાવરણની સમતુલા જાળવવામાં ઉપયોગી થાય છે.",
+  "ઇતર વાંચન",
+  "લખાણ શુદ્ધિ સાથેનું મરોડદાર અક્ષરલેખન",
+  "મૌલિક વાર્તાકથન, વક્તવ્ય",
+  "ગાન/વાદન (અભિનય, બાળગીત વગેરે)",
+  "નાટ્ય/નૃત્ય / એકપાત્ર/અભિનય",
+  "ચિત્રમાં રેખાંકન સ્પષ્ટ અને સુંદર કરે છે.",
+  "ચિત્રમાં રંગપૂરણી સારી કરે છે.",
+  "યૌગિક ક્રિયાઓ ઉત્સાહપૂર્વક કરે છે.",
+  "સરળ આસનો યોગ્ય સ્થિતિમાં કરે છે.",
+  "સાંઘિક રમતો કૌશલ્યપૂર્વક રમે છે.",
+  "ખેલકૂદ અને શારીરિક પ્રવૃત્તિ લયબદ્ધ રીતે કરે છે.",
+  "ઉત્સવ ઉજવણી",
+  "વિશેષ દિન ઉજવણી",
+  "પ્રશ્નમંચ(ક્વિઝ)માં ભાગીદારી",
+  "મૂલ્યશિક્ષણની પ્રવૃત્તિમાં ભાગીદારી",
+  "વિવિધ સ્પર્ધાઓ",
+  "ઇકો ક્લબની પ્રવૃત્તિમાં સહભાગિતા",
+  "પ્રવાસ-પર્યટન/મુલાકાત",
+  "માટીકામ/બાગકામ/શાળા સુશોભન",
+  "કાગળકામ/ ટી.એલ.એમ. નિર્માણમાં સહયોગ",
+  "અભ્યાસ સામગ્રીમાંથી ભારતીય સાંસ્કૃતિક વારસાની સમજ મેળવે છે.",
+  "શ્લોક કંઠસ્થ કરે છે અને સમૂહ ગાન કરે છે.",
+  "અભ્યાસ સામગ્રીને સંવાદ કે નાટક સ્વરૂપે રજૂ કરે છે.",
+  "અભ્યાસ સામગ્રી વિષયક ચિંતન અને નોંધ કરે છે.",
+  "સામગ્રીમાં રજૂ થયેલ ભાવ શાબ્દિક-અશાબ્દિક રીતે વ્યક્ત કરે છે.",
+  "અભ્યાસ સામગ્રી આધારિત વિવિધ પ્રવૃત્તિમાં ભાગ લે છે.",
+  "અભ્યાસ સામગ્રીમાં મૂલ્યો અને સિદ્ધાંતોને પોતાના વર્તનમાં ઉતારે છે.",
+  "ભારતીય સંસ્કૃતિ અને જ્ઞાન પ્રણાલીના મૂલ્યો અને સિદ્ધાંતોને સમજે છે.",
+  "અભ્યાસ સામગ્રી આધારિત વિવિધ સ્પર્ધાઓમાં ભાગ લે છે.",
+  "વિવિધ શબ્દોના અર્થ સાંસ્કૃતિક સંદર્ભ સહિત જાણે/જાણે છે."
+];
+
+const PB_GROUPS = [
+  {k:"ક્ષેત્ર - ૧", subs:[{t:"વ્યક્તિગત અને સામાજિક ગુણો", n:5}]},
+  {k:"ક્ષેત્ર - ૨", subs:[{t:"વિદ્યાર્થી વલણો", n:5}]},
+  {k:"ક્ષેત્ર - ૩  વિદ્યાર્થીના રસના ક્ષેત્રો", subs:[
+    {t:"સાહિત્ય", n:2},{t:"સંગીત અને કલા", n:4},{t:"શા.શિ. અને યોગ", n:5}]},
+  {k:"ક્ષેત્ર - ૪", subs:[
+    {t:"સાંસ્કૃતિક ઉજવણી", n:2},{t:"સહશૈક્ષણિક પ્રવૃત્તિઓ", n:4},{t:"કાર્યાનુભવ", n:3}]},
+  {k:"ક્ષેત્ર - ૫", subs:[{t:"ભારતીય જ્ઞાન પ્રણાલી", n:10}]}
+];
+
+let PB = null;
+
+function pbRef(sem){
+  return db.collection("students").doc(currentUser.uid)
+    .collection("classes").doc(selectedStandard+"_"+selectedDivision)
+    .collection("marks").doc("sem"+sem+"_patrakB");
+}
+
+/* કુલ ગુણને 40 મુદ્દામાં રેન્ડમ વહેંચે (દરેક મુદ્દો 0 થી 10, સરવાળો = કુલ ગુણ) */
+function pbDistribute(total){
+  const T = Math.max(0,Math.min(400,total));
+  const base = Math.floor(T/40);
+  const rem = T - base*40;
+  const arr = new Array(40).fill(base);
+
+  // બાકી ગુણ કોઈ પણ મુદ્દામાં +1
+  const idx = [];
+  for(let i=0;i<40;i++) idx.push(i);
+  idx.sort(function(){ return Math.random()-0.5; });
+  for(let k=0;k<rem;k++) arr[idx[k]]++;
+
+  // થોડો ફેરફાર: સરેરાશની આજુબાજુ (±1) જ રહે, સરવાળો એ જ રહે
+  const lo = Math.max(0,base-1);
+  const hi = Math.min(10,base+1);
+  for(let k=0;k<30;k++){
+    const i = Math.floor(Math.random()*40);
+    const j = Math.floor(Math.random()*40);
+    if(i!==j && arr[i]+1<=hi && arr[j]-1>=lo){
+      arr[i]++;
+      arr[j]--;
+    }
+  }
+  return arr;
+}
+
+async function loadPatrakB(sem){
+  const box = document.getElementById("pb-sem"+sem);
+
+  if(!selectedStandard || !selectedDivision){
+    box.innerHTML = '<div class="info-box">પહેલા મુખ્ય પેજ પરથી ધોરણ અને વર્ગ પસંદ કરો.</div>';
+    return;
+  }
+  if(students.length===0){
+    box.innerHTML = '<div class="info-box">પહેલા વિદ્યાર્થીની માહિતી સાચવો.</div>';
+    return;
+  }
+
+  const sems = sem===2 ? [1,2] : [1];
+  let snaps;
+  try{
+    showLoading(true);
+    snaps = await Promise.all(sems.map(function(sm){ return pbRef(sm).get(); }));
+  }catch(e){
+    box.innerHTML = '<div class="info-box">' + escapeHtml(firebaseError(e)) + '</div>';
+    return;
+  }finally{
+    showLoading(false);
+  }
+
+  const data = {};
+  students.forEach(function(st){
+    data[st.srNo] = {};
+    sems.forEach(function(sm,si){
+      const sd = snaps[si].exists ? snaps[si].data() : null;
+      const rec = sd && sd.students && sd.students[st.srNo] ? sd.students[st.srNo] : null;
+      const items = new Array(40).fill("");
+      if(rec && Array.isArray(rec.items)){
+        rec.items.forEach(function(v,i){ if(i<40 && typeof v==="number") items[i] = v; });
+      }
+      data[st.srNo][sm] = {items:items, total:(rec && typeof rec.total==="number") ? rec.total : ""};
+    });
+  });
+
+  PB = {sem:sem, data:data};
+  pbRender();
+}
+
+function pbAnnual(sr){
+  const r = PB.data[sr];
+  if(!r[1] || !r[2]) return "";
+  return (r[1].total!=="" && r[2].total!=="") ? Math.round((r[1].total + r[2].total)/2) : "";
+}
+
+function pbRender(){
+  const sem = PB.sem;
+  const two = sem===2;
+  const box = document.getElementById("pb-sem"+sem);
+
+  let h = '<div class="info-box">' +
+    (two
+      ? 'સેમેસ્ટર-1 (પ્રથમ) ના ગુણ લોક છે, ફક્ત <b>દ્વિતીય</b> સત્રના ગુણ લખાશે. '
+      : 'ફક્ત <b>પ્રથમ</b> સત્રના ગુણ લખવાના છે. ') +
+    'દરેક મુદ્દાના 10 ગુણ (કુલ 40 મુદ્દા = 400). <b>કુલ ગુણ</b> ના ખાનામાં ગુણ લખી બહાર દબાવશો તો 40 મુદ્દામાં ગુણ આપોઆપ (રેન્ડમ) ભરાઈ જશે. મુદ્દાના ગુણ હાથે પણ બદલી શકાય.' +
+    '</div><div class="table-wrap"><table class="pb-table"><thead>';
+
+  // હરોળ 1: ક્ષેત્ર
+  h += '<tr><th rowspan="3">ક્રમ</th><th rowspan="3">વિદ્યાર્થીનું નામ</th><th rowspan="3">સત્ર</th>';
+  PB_GROUPS.forEach(function(g){
+    const span = g.subs.reduce(function(a,x){ return a + x.n; },0);
+    h += '<th colspan="' + span + '">' + escapeHtml(g.k) + '</th>';
+  });
+  if(two){
+    h += '<th rowspan="3">કુલ ગુણ<br>સત્ર-1<br>(400)</th><th rowspan="3">કુલ ગુણ<br>સત્ર-2<br>(400)</th><th rowspan="3">વાર્ષિક એકંદર<br>(400 માંથી)</th>';
+  }else{
+    h += '<th rowspan="3">કુલ ગુણ<br>સત્ર-1<br>(400)</th>';
+  }
+  h += '</tr>';
+
+  // હરોળ 2: પેટા વિભાગ
+  h += '<tr>';
+  PB_GROUPS.forEach(function(g){
+    g.subs.forEach(function(sb){ h += '<th colspan="' + sb.n + '">' + escapeHtml(sb.t) + '</th>'; });
+  });
+  h += '</tr>';
+
+  // હરોળ 3: 40 મુદ્દા
+  h += '<tr>';
+  PB_ITEMS.forEach(function(t,i){
+    h += '<th><div class="rot">' + (i+1) + '. ' + escapeHtml(t) + '</div></th>';
+  });
+  h += '</tr></thead><tbody>';
+
+  students.forEach(function(st){
+    const sr = st.srNo;
+    const terms = two ? [1,2] : [1];
+
+    terms.forEach(function(t,ri){
+      const locked = two && t===1;
+      const rec = PB.data[sr][t];
+      h += '<tr>';
+
+      if(ri===0){
+        h += '<td rowspan="' + terms.length + '">' + sr + '</td>' +
+             '<td class="tri-name" rowspan="' + terms.length + '">' + escapeHtml(st.name||"") + '</td>';
+      }
+      h += '<td class="sem">' + (t===1 ? "પ્રથમ" : "દ્વિતીય") + '</td>';
+
+      for(let i=0;i<40;i++){
+        h += '<td><input type="number" min="0" max="10" step="1" class="pb-in" data-sr="' + sr +
+             '" data-t="' + t + '" data-i="' + i + '" value="' + rec.items[i] + '"' +
+             (locked ? ' disabled' : '') + ' oninput="onPbItem(this)"></td>';
+      }
+
+      if(ri===0){
+        if(two){
+          const t1 = PB.data[sr][1].total;
+          const an = pbAnnual(sr);
+          h += '<td class="tt" rowspan="2"><span id="pb_t1_' + sr + '">' + (t1==="" ? "-" : t1) + '</span></td>' +
+               '<td rowspan="2"><input type="number" min="0" max="400" step="1" class="pb-tot" data-sr="' + sr +
+               '" data-t="2" value="' + PB.data[sr][2].total + '" onchange="onPbTotal(this)"></td>' +
+               '<td class="tt" rowspan="2"><span id="pb_an_' + sr + '">' + (an==="" ? "-" : an) + '</span></td>';
+        }else{
+          h += '<td><input type="number" min="0" max="400" step="1" class="pb-tot" data-sr="' + sr +
+               '" data-t="1" value="' + rec.total + '" onchange="onPbTotal(this)"></td>';
+        }
+      }
+      h += '</tr>';
+    });
+  });
+
+  h += '</tbody></table></div>' +
+    '<button class="save-btn" onclick="savePatrakB(' + sem + ')">💾 પત્રક-B સાચવો</button>' +
+    '<div id="pb' + sem + '_status" class="status"></div>' +
+    '<div class="export-bar">' +
+      '<button class="action-btn pdf" onclick="pbExport(' + sem + ',\'pdf\')">📄 PDF સેવ</button>' +
+      '<button class="action-btn excel" onclick="pbExport(' + sem + ',\'excel\')">📊 Excel Export</button>' +
+      '<button class="action-btn print" onclick="pbExport(' + sem + ',\'print\')">🖨️ પ્રિન્ટ</button>' +
+    '</div>';
+
+  box.innerHTML = h;
+}
+
+function pbRowInputs(sr,t){
+  return document.querySelectorAll('#pb-sem' + PB.sem + ' input.pb-in[data-sr="' + sr + '"][data-t="' + t + '"]');
+}
+
+function pbTotalInput(sr,t){
+  return document.querySelector('#pb-sem' + PB.sem + ' input.pb-tot[data-sr="' + sr + '"][data-t="' + t + '"]');
+}
+
+function pbAfterChange(sr){
+  if(PB.sem!==2) return;
+  const r = PB.data[sr];
+  const a1 = document.getElementById("pb_t1_" + sr);
+  const an = document.getElementById("pb_an_" + sr);
+  if(a1) a1.innerText = r[1].total==="" ? "-" : r[1].total;
+  if(an){
+    const v = pbAnnual(sr);
+    an.innerText = v==="" ? "-" : v;
+  }
+}
+
+function onPbItem(inp){
+  const sr = inp.dataset.sr;
+  const t = Number(inp.dataset.t);
+  const i = Number(inp.dataset.i);
+
+  let v = inp.value==="" ? "" : parseInt(inp.value);
+  if(v!==""){
+    if(isNaN(v)) v = "";
+    else if(v<0){ v = 0; inp.value = 0; }
+    else if(v>10){ v = 10; inp.value = 10; }
+  }
+
+  const rec = PB.data[sr][t];
+  rec.items[i] = v;
+
+  const any = rec.items.some(function(x){ return x!==""; });
+  rec.total = any ? rec.items.reduce(function(a,x){ return a + (x==="" ? 0 : x); },0) : "";
+
+  const ti = pbTotalInput(sr,t);
+  if(ti) ti.value = rec.total;
+  pbAfterChange(sr);
+}
+
+function onPbTotal(inp){
+  const sr = inp.dataset.sr;
+  const t = Number(inp.dataset.t);
+  const rec = PB.data[sr][t];
+
+  let v = inp.value==="" ? "" : parseInt(inp.value);
+
+  if(v==="" || isNaN(v)){
+    rec.items = new Array(40).fill("");
+    rec.total = "";
+    inp.value = "";
+  }else{
+    if(v<0) v = 0;
+    if(v>400) v = 400;
+    inp.value = v;
+    rec.items = pbDistribute(v);
+    rec.total = v;
+  }
+
+  pbRowInputs(sr,t).forEach(function(el){
+    el.value = rec.items[Number(el.dataset.i)];
+  });
+  pbAfterChange(sr);
+}
+
+async function savePatrakB(sem){
+  const status = document.getElementById("pb" + sem + "_status");
+  const out = {};
+
+  Object.keys(PB.data).forEach(function(sr){
+    const rec = PB.data[sr][sem];
+    out[sr] = {
+      items: rec.items.map(function(x){ return x==="" ? null : x; }),
+      total: rec.total==="" ? null : rec.total
+    };
+  });
+
+  try{
+    showLoading(true);
+    await pbRef(sem).set({
+      students:out,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    status.style.color = "green";
+    status.innerText = "પત્રક-B સફળતાપૂર્વક સાચવાઈ ગયું.";
+  }catch(e){
+    status.style.color = "red";
+    status.innerText = firebaseError(e);
+  }finally{
+    showLoading(false);
+  }
+}
+
+
+/* =========================================================
+   PATRAK-C (પરિણામ પત્રક) - સેમેસ્ટર-1 અને સેમેસ્ટર-2
+   ગુણ ત્રિમાસિક + સત્રાંત + સ્વ અધ્યયન + હાજરી + પત્રક-B માંથી આપોઆપ (બધા પૂર્ણાંક)
+========================================================= */
+
+/* ગ્રેડ પદ્ધતિ (ટકા પ્રમાણે): A 80-100, B 65-79, C 50-64, D 35-49, E 35 થી ઓછા */
+const PC_GRADES = [
+  [80,"A"],[65,"B"],[50,"C"],[35,"D"],[0,"E"]
+];
+
+let PC = null;
+
+function pcGrade(v){
+  if(v==="" || v===null || v===undefined) return "";
+  for(let i=0;i<PC_GRADES.length;i++){
+    if(v >= PC_GRADES[i][0]) return PC_GRADES[i][1];
+  }
+  return "E";
+}
+
+/* ત્રિમાસિક / સત્રાંતના કુલ ગુણને target (40) માં ફેરવીને પૂર્ણાંક કરે */
+function pcScaled(dta,sr,target){
+  if(!dta || !dta.marks || !dta.marks[sr]) return "";
+  const rec = dta.marks[sr];
+  const entered = Array.isArray(rec.marks) && rec.marks.some(function(v){ return v!==null && v!==undefined; });
+  if(!entered) return "";
+  const total = typeof rec.total==="number" ? rec.total : rec.marks.reduce(function(a,v){ return a+(v||0); },0);
+  const mx = typeof dta.maxTotal==="number" ? dta.maxTotal : 0;
+  if(mx<=0) return "";
+  return Math.round(mx===target ? total : total*target/mx);
+}
+
+function pcSwaMark(dta,sr){
+  if(!dta || !dta.marks || !dta.marks[sr]) return "";
+  const m = dta.marks[sr].mark;
+  return (m===null || m===undefined) ? "" : Math.round(m);
+}
+
+function pbTotalOf(pd,sr){
+  return (pd && pd.students && pd.students[sr] && typeof pd.students[sr].total==="number") ? pd.students[sr].total : "";
+}
+
+async function pcFetch(sem){
+  if(!selectedStandard || !selectedDivision){
+    return "પહેલા મુખ્ય પેજ પરથી ધોરણ અને વર્ગ પસંદ કરો.";
+  }
+  if(students.length===0){
+    return "પહેલા વિદ્યાર્થીની માહિતી સાચવો.";
+  }
+
+  const sems = sem===2 ? [1,2] : [1];
+  let snaps, attSnaps, pbSnaps;
+
+  try{
+    showLoading(true);
+    snaps = await Promise.all(TRI_SUBJECTS.map(function(sb){
+      return Promise.all(sems.map(function(sm){
+        return Promise.all([
+          examDocRef("tri",sm,sb.id).get(),
+          examDocRef("sat",sm,sb.id).get(),
+          swaDocRef(sm,sb.id).get()
+        ]);
+      }));
+    }));
+    attSnaps = await Promise.all(sems.map(function(sm){ return attRef(sm).get(); }));
+    pbSnaps = await Promise.all(sems.map(function(sm){ return pbRef(sm).get(); }));
+  }catch(e){
+    return firebaseError(e);
+  }finally{
+    showLoading(false);
+  }
+
+  // જે વિષયના કોઈ પણ ગુણ સાચવેલા છે તે જ લેવા
+  const subs = [];
+  TRI_SUBJECTS.forEach(function(sb,i){
+    let any = false;
+    const d = sems.map(function(sm,si){
+      const r = snaps[i][si];
+      if(r[0].exists || r[1].exists || r[2].exists) any = true;
+      return {
+        tri:r[0].exists ? r[0].data() : null,
+        sat:r[1].exists ? r[1].data() : null,
+        swa:r[2].exists ? r[2].data() : null
+      };
+    });
+    if(any) subs.push({name:sb.name, d:d});
+  });
+
+  if(subs.length===0){
+    PC = null;
+    return "હજી કોઈ વિષયના ગુણ સાચવ્યા નથી. પહેલા ત્રિમાસિક, સત્રાંત અને સ્વ અધ્યયનના ગુણ સાચવો.";
+  }
+
+  const attData = attSnaps.map(function(sn){ return sn.exists ? sn.data() : null; });
+  const pbData = pbSnaps.map(function(sn){ return sn.exists ? sn.data() : null; });
+
+  // હાજરી: જે સેમેસ્ટરનું પત્રક હોય તે જ સેમેસ્ટરની હાજરી
+  const ad = attData[sems.length-1];
+  const workDays = (ad && typeof ad.totalDays==="number") ? ad.totalDays : "";
+
+  PC = {
+    sem:sem,
+    subs:subs,
+    workDays:workDays,
+    vvMax:0,
+    maxTotal:0,
+    subjMax:0,
+    students: students.map(function(st){
+      const sr = st.srNo;
+      const raw = subs.map(function(sb){
+        return sb.d.map(function(x){
+          return {
+            tri:pcScaled(x.tri,sr,40),
+            sat:pcScaled(x.sat,sr,40),
+            swa:pcSwaMark(x.swa,sr)
+          };
+        });
+      });
+
+      const att = (ad && ad.att && typeof ad.att[sr]==="number") ? ad.att[sr] : "";
+
+      // વ્યક્તિત્વ વિકાસ = પત્રક-B (સેમ-1: સત્ર-1 | સેમ-2: વાર્ષિક એકંદર)
+      let vv = "";
+      if(sem===1){
+        vv = pbTotalOf(pbData[0],sr);
+      }else{
+        const t1 = pbTotalOf(pbData[0],sr);
+        const t2 = pbTotalOf(pbData[1],sr);
+        vv = (t1!=="" && t2!=="") ? Math.round((t1+t2)/2) : "";
+      }
+
+      return {
+        sr:Number(sr), name:st.name||"", gr:st.gr||"", dob:st.dob||"",
+        att:att, vv:vv, raw:raw, subj:[],
+        total:"", percent:"", grade:"", rank:"", hasAny:false
+      };
+    })
+  };
+
+  PC.vvMax = PC.students.some(function(x){ return x.vv!==""; }) ? 400 : 0;
+
+  pcCompute();
+  return "";
+}
+
+async function loadPatrakC(sem){
+  const box = document.getElementById("pc-sem"+sem);
+  const msg = await pcFetch(sem);
+  if(msg){
+    box.innerHTML = '<div class="info-box">' + escapeHtml(msg) + '</div>';
+    return;
+  }
+  pcRenderScreen();
+}
+
+function pcCompute(){
+  const n = PC.subs.length;
+  const sem = PC.sem;
+  const vvMax = PC.vvMax>0 ? PC.vvMax : 0;
+
+  PC.subjMax = sem===2 ? 200 : 100;
+  PC.maxTotal = n*PC.subjMax + vvMax;
+
+  PC.students.forEach(function(s){
+    let sum = 0;
+    let any = false;
+
+    s.subj = s.raw.map(function(rs){
+      const semTots = rs.map(function(r){
+        const parts = [r.tri,r.sat,r.swa];
+        const has = parts.some(function(x){ return x!==""; });
+        return has ? parts.reduce(function(a,x){ return a + (x==="" ? 0 : x); },0) : "";
+      });
+
+      const o = {r:rs, tot1:semTots[0], tot2:(semTots.length>1 ? semTots[1] : ""), tot:"", grade:""};
+
+      if(sem===1){
+        o.tot = o.tot1;
+      }else{
+        o.tot = (o.tot1==="" && o.tot2==="") ? "" : (o.tot1==="" ? 0 : o.tot1) + (o.tot2==="" ? 0 : o.tot2);
+      }
+
+      o.grade = o.tot==="" ? "" : pcGrade(o.tot*100/PC.subjMax);
+      if(o.tot!==""){ any = true; sum += o.tot; }
+      return o;
+    });
+
+    if(any && vvMax>0 && s.vv!=="") sum += s.vv;
+
+    s.hasAny = any;
+    s.total = any ? sum : "";
+    s.percent = (any && PC.maxTotal>0) ? Number((s.total/PC.maxTotal*100).toFixed(2)) : "";
+    s.grade = pcGrade(s.percent);
+  });
+
+  // ક્રમાંક (સરખા ગુણ હોય તો સરખો ક્રમાંક)
+  const totals = PC.students.filter(function(x){ return x.hasAny; })
+    .map(function(x){ return x.total; })
+    .sort(function(a,b){ return b-a; });
+
+  PC.students.forEach(function(s){
+    s.rank = s.hasAny ? totals.indexOf(s.total)+1 : "";
+  });
+}
+
+/* કોલમ મુજબ પાના બનાવે (2-2 વિષયનું એક પાનું, છેલ્લા પાને કુલ/ટકા/ક્રમાંક) */
+function pcPages(){
+  const nmW = nameColW(PC.students.map(function(x){ return x.name; }),11);
+  const n = PC.subs.length;
+  const sem = PC.sem;
+  const chunks = [];
+  for(let i=0;i<n;i+=2){
+    const c = [i];
+    if(i+1<n) c.push(i+1);
+    chunks.push(c);
+  }
+
+  const pages = [];
+
+  chunks.forEach(function(ch,pi){
+    const cols = [
+      {k:"sr",   label:"ક્રમ", w:28, xw:6,  get:function(s){return s.sr;}},
+      {k:"name", label:"વિદ્યાર્થીનું નામ", w:nmW, xw:Math.min(60,Math.max(26,Math.round(nmW/6))), left:true, get:function(s){return s.name;}}
+    ];
+
+    if(pi===0){
+      cols.push({k:"gr",  label:"જ.ર.ન.", w:50, xw:10, get:function(s){return s.gr;}});
+      cols.push({k:"dob", label:"જ.તા.",  w:68, xw:12, get:function(s){return s.dob;}});
+      cols.push({k:"att", label:"હાજરી",  w:34, xw:7, rot:true,
+        max:function(){ return PC.workDays; }, get:function(s){return s.att;}});
+    }
+
+    ch.forEach(function(si){
+      const nm = PC.subs[si].name;
+      const T = "ત્રિમાસિક કસોટી", S = "સત્રાંતે મૂલ્યાંકન", W = "સ્વ-અધ્યયન કાર્યનું મૂલ્યાંકન";
+      let defs;
+
+      if(sem===1){
+        defs = [
+          {id:"tri",sub:"પ્રથમ સત્ર",label:T,max:40,get:function(s){return s.subj[si].r[0].tri;}},
+          {id:"sat",sub:"પ્રથમ સત્ર",label:S,max:40,get:function(s){return s.subj[si].r[0].sat;}},
+          {id:"swa",sub:"પ્રથમ સત્ર",label:W,max:20,get:function(s){return s.subj[si].r[0].swa;}},
+          {id:"tot",label:"કુલ ગુણ 100 માંથી મેળવેલ ગુણ",w:40,xw:8,max:100,cls:"tt",get:function(s){return s.subj[si].tot;}},
+          {id:"grade",label:"ગ્રેડ",w:34,xw:7,max:"",cls:"gg",get:function(s){return s.subj[si].grade;}}
+        ];
+      }else{
+        defs = [
+          {id:"a1",sub:"પ્રથમ સત્ર",label:T,max:40,get:function(s){return s.subj[si].r[0].tri;}},
+          {id:"a2",sub:"પ્રથમ સત્ર",label:S,max:40,get:function(s){return s.subj[si].r[0].sat;}},
+          {id:"a3",sub:"પ્રથમ સત્ર",label:W,max:20,get:function(s){return s.subj[si].r[0].swa;}},
+          {id:"b1",sub:"દ્વિતીય સત્ર",label:T,max:40,get:function(s){return s.subj[si].r[1].tri;}},
+          {id:"b2",sub:"દ્વિતીય સત્ર",label:S,max:40,get:function(s){return s.subj[si].r[1].sat;}},
+          {id:"b3",sub:"દ્વિતીય સત્ર",label:W,max:20,get:function(s){return s.subj[si].r[1].swa;}},
+          {id:"ann",label:"કુલ ગુણ 200 માંથી મેળવેલ ગુણ",w:40,xw:8,max:200,cls:"tt",get:function(s){return s.subj[si].tot;}},
+          {id:"grade",label:"ગ્રેડ",w:34,xw:7,max:"",cls:"gg",get:function(s){return s.subj[si].grade;}}
+        ];
+      }
+
+      defs.forEach(function(d){
+        cols.push({k:"s"+d.id, group:nm, sub:d.sub, label:d.label, w:d.w||34, xw:d.xw||6,
+          rot:true, cls:d.cls||"", max:d.max, get:d.get});
+      });
+    });
+
+    if(pi===chunks.length-1){
+      cols.push({k:"vv", label:"વ્યક્તિત્વ વિકાસ (પત્રક-B)", w:40, xw:8, rot:true,
+        max:function(){ return PC.vvMax>0 ? PC.vvMax : ""; }, get:function(s){return s.vv;}});
+      cols.push({k:"ptot", label:"એકંદરે કુલ ગુણ", w:46, xw:9, rot:true, cls:"tt",
+        max:function(){ return PC.maxTotal; }, get:function(s){return s.total;}});
+      cols.push({k:"ppct", label:"એકંદરે કુલ ગુણ ટકા", w:46, xw:9, rot:true, cls:"tt", max:"", get:function(s){return s.percent;}});
+      cols.push({k:"pgrade", label:"ગ્રેડ", w:36, xw:7, rot:true, cls:"gg", max:"", get:function(s){return s.grade;}});
+      cols.push({k:"prank", label:"મેળવેલ ક્રમાંક", w:40, xw:8, rot:true, cls:"gg", max:"", get:function(s){return s.rank;}});
+    }
+
+    pages.push({cols:cols});
+  });
+
+  return pages;
+}
+
+const PC_RH = 120;   // છેલ્લી હેડર હરોળની ઊંચાઈ (90° ફેરવેલ લખાણ)
+
+function pcTableHTML(cols,screen,from,to){
+  const total = cols.reduce(function(a,c){ return a + c.w; },0);
+  const list = PC.students.slice(from||0, to===undefined ? PC.students.length : to);
+  const color = screen ? "#ffffff" : "#000000";
+
+  function cell(c,H,span){
+    const inner = c.rot ? rotTh(c.label,c.w-4,H,color,true) : escapeHtml(c.label);
+    return '<th' + span + '>' + inner + '</th>';
+  }
+
+  let h = '<table class="pc" style="table-layout:fixed;width:' + total + 'px;min-width:0"><colgroup>' +
+    cols.map(function(c){ return '<col style="width:' + c.w + 'px">'; }).join("") +
+    '</colgroup><thead>';
+
+  let r1 = "<tr>";
+  let r2 = "<tr>";
+  let r3 = "<tr>";
+  let i = 0;
+  while(i<cols.length){
+    const c = cols[i];
+    if(!c.group){
+      r1 += cell(c,PC_RH+50,' rowspan="3"');
+      i++;
+      continue;
+    }
+    let j = i;
+    while(j<cols.length && cols[j].group===c.group) j++;
+    r1 += '<th colspan="' + (j-i) + '">' + escapeHtml(c.group) + '</th>';
+
+    let x = i;
+    while(x<j){
+      const cx = cols[x];
+      if(cx.sub){
+        let y = x;
+        while(y<j && cols[y].sub===cx.sub) y++;
+        r2 += '<th colspan="' + (y-x) + '">' + escapeHtml(cx.sub) + '</th>';
+        for(let z=x;z<y;z++) r3 += cell(cols[z],PC_RH,'');
+        x = y;
+      }else{
+        r2 += cell(cx,PC_RH+22,' rowspan="2"');
+        x++;
+      }
+    }
+    i = j;
+  }
+  h += r1 + "</tr>" + r2 + "</tr>" + r3 + "</tr>";
+
+  // કુલ ગુણની હરોળ
+  h += '<tr class="mx">';
+  cols.forEach(function(c){
+    let v = c.k==="name" ? "કુલ ગુણ" : (typeof c.max==="function" ? c.max() : c.max);
+    if(v===undefined || v===null) v = "";
+    h += '<td>' + escapeHtml(String(v)) + '</td>';
+  });
+  h += '</tr></thead><tbody>';
+
+  list.forEach(function(s){
+    h += '<tr>';
+    cols.forEach(function(c){
+      const v = c.get(s);
+      const cls = ((c.left ? "l " : "") + (c.cls || "")).trim();
+      h += '<td' + (cls ? ' class="' + cls + '"' : '') + '>' + escapeHtml(String(v)) + '</td>';
+    });
+    h += '</tr>';
+  });
+
+  h += '</tbody></table>';
+  return h;
+}
+
+function pcRenderScreen(){
+  const sem = PC.sem;
+  const box = document.getElementById("pc-sem"+sem);
+
+  box.innerHTML = `
+    <div class="info-box">ગુણ ત્રિમાસિક, સત્રાંત, સ્વ અધ્યયન, <b>હાજરી</b> અને <b>પત્રક-B</b> (વ્યક્તિત્વ વિકાસ) ની એન્ટ્રીમાંથી આપોઆપ (પૂર્ણાંકમાં) આવે છે. અહીં કંઈ લખવાનું નથી.</div>
+
+    <div id="pc${sem}_tables"></div>
+
+    <button class="save-btn" style="background:#147a35" onclick="loadPatrakC(${sem})">🔄 ગુણ ફરી લોડ કરો</button>
+
+    <div class="export-bar">
+      <button class="action-btn pdf" onclick="patrakC(${sem},'pdf')">📄 PDF સેવ</button>
+      <button class="action-btn excel" onclick="patrakC(${sem},'excel')">📊 Excel Export</button>
+      <button class="action-btn print" onclick="patrakC(${sem},'print')">🖨️ પ્રિન્ટ</button>
+    </div>
+  `;
+
+  const pages = pcPages();
+  document.getElementById("pc"+sem+"_tables").innerHTML = pages.map(function(p,i){
+    return '<div style="margin-bottom:18px">' +
+      '<div style="font-weight:bold;color:#202d71;margin-bottom:6px">પાનું ' + (i+1) + ' / ' + pages.length + '</div>' +
+      '<div class="table-wrap">' + pcTableHTML(p.cols,true) + '</div></div>';
+  }).join("");
+}
+
+function pcExportData(){
+  const pages = pcPages();
+  const year = document.getElementById("academicYear").value;
+  const school = document.getElementById("schoolName").value.trim();
+  const info = "ધોરણ " + selectedStandard + " | વર્ગ " + selectedDivision +
+               (year ? " | વર્ષ " + year : "");
+
+  return {
+    school:school, info:info, info2:"", title:"પત્રક-C",
+    fileTitle:"સેમેસ્ટર-" + PC.sem + "_પત્રક-C", plain:true,
+    landscape:false, headers:[], rows:[],
+    pages:pages
+  };
+}
+
+function pcPageHTML(d,p,pi,from,to,ci,cn){
+  return '<div class="rpt">' + rptHead(d.school,true) +
+    '<div class="sub"><b>' + escapeHtml(d.title) + '</b></div>' +
+    '<div class="sub">' + escapeHtml(d.info) + '</div>' +
+    pcTableHTML(p.cols,false,from,to) + '</div>';
+}
+
+function patrakC(sem,action){
+  if(!PC || PC.sem!==sem){
+    alert("પહેલા ગુણ લોડ થવા દો. ('ગુણ ફરી લોડ કરો' દબાવો)");
+    return;
+  }
+  const d = pcExportData();
+  if(action==="pdf") saveReportPdf(d);
+  else if(action==="excel") exportReportExcel(d);
+  else printReport(d);
+}
+
+/* ---------- EXCEL (બધા પાના એક જ શીટમાં, A4 Portrait) ---------- */
+
+function xlDownload(wb,d){
+  return wb.xlsx.writeBuffer().then(function(buffer){
+    const blob = new Blob([buffer],{
+      type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = reportFileName(d,"xlsx");
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+}
+
+async function exportPatrakExcel(d){
+  try{
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("પત્રક-C");
+    const thin = {style:"thin"};
+    const border = {top:thin,left:thin,bottom:thin,right:thin};
+
+    // બધા પાનાની કોલમ એક હરોળમાં (વચ્ચે પાતળી ખાલી કોલમ)
+    const all = [];
+    d.pages.forEach(function(pg,pi){
+      if(pi>0) all.push({spacer:true, xw:2});
+      pg.cols.forEach(function(c){ all.push(c); });
+    });
+    const n = all.length;
+
+    function head(c,rot){
+      c.font = {bold:true};
+      c.alignment = rot
+        ? {horizontal:"center",vertical:"middle",wrapText:true,textRotation:90}
+        : {horizontal:"center",vertical:"middle",wrapText:true};
+      c.border = border;
+    }
+
+    const hr = xlTitles(ws,wb,d,n);
+
+    // હેડર (3 હરોળ): વિષય / પ્રથમ-દ્વિતીય સત્ર / 90° ફેરવેલ નામ
+    let i = 0;
+    while(i<n){
+      const c = all[i];
+      if(c.spacer){ i++; continue; }
+
+      if(!c.group){
+        ws.mergeCells(hr,i+1,hr+2,i+1);
+        const h = ws.getCell(hr,i+1);
+        h.value = c.label;
+        head(h,!!c.rot);
+        i++;
+        continue;
+      }
+
+      let j = i;
+      while(j<n && all[j].group===c.group) j++;
+      ws.mergeCells(hr,i+1,hr,j);
+      const g = ws.getCell(hr,i+1);
+      g.value = c.group;
+      head(g,false);
+
+      let x = i;
+      while(x<j){
+        const cx = all[x];
+        if(cx.sub){
+          let y = x;
+          while(y<j && all[y].sub===cx.sub) y++;
+          ws.mergeCells(hr+1,x+1,hr+1,y);
+          const sb = ws.getCell(hr+1,x+1);
+          sb.value = cx.sub;
+          head(sb,false);
+          for(let z=x;z<y;z++){
+            const l = ws.getCell(hr+2,z+1);
+            l.value = all[z].label;
+            head(l,true);
+          }
+          x = y;
+        }else{
+          ws.mergeCells(hr+1,x+1,hr+2,x+1);
+          const l = ws.getCell(hr+1,x+1);
+          l.value = cx.label;
+          head(l,true);
+          x++;
+        }
+      }
+      i = j;
+    }
+    ws.getRow(hr).height = 26;
+    ws.getRow(hr+1).height = 22;
+    ws.getRow(hr+2).height = 118;
+
+    // કુલ ગુણની હરોળ
+    const mr = hr + 3;
+    all.forEach(function(c,idx){
+      if(c.spacer) return;
+      const cell = ws.getCell(mr,idx+1);
+      const v = c.k==="name" ? "કુલ ગુણ" : (typeof c.max==="function" ? c.max() : c.max);
+      cell.value = (v===undefined || v===null) ? "" : v;
+      cell.font = {bold:true};
+      cell.alignment = {horizontal:"center",vertical:"middle"};
+      cell.border = border;
+    });
+
+    // વિદ્યાર્થીની હરોળ
+    PC.students.forEach(function(s,ri){
+      const rowNo = mr + 1 + ri;
+      ws.getRow(rowNo).height = 20;
+      all.forEach(function(c,idx){
+        if(c.spacer) return;
+        const cell = ws.getCell(rowNo,idx+1);
+        cell.value = c.get(s);
+        cell.border = border;
+        cell.alignment = {horizontal:c.left ? "left" : "center",vertical:"middle"};
+        if(c.cls==="tt"){
+          cell.font = {bold:true};
+        }
+        if(c.cls==="gg") cell.font = {bold:true};
+      });
+    });
+
+    all.forEach(function(c,idx){ ws.getColumn(idx+1).width = c.xw || 6; });
+
+    ws.pageSetup = {
+      paperSize:9,
+      orientation:"portrait",
+      fitToPage:true,
+      fitToWidth:d.pages.length,
+      fitToHeight:1,
+      horizontalCentered:true,
+      margins:{left:0.3,right:0.3,top:0.5,bottom:0.5,header:0.3,footer:0.3}
+    };
+
+    await xlDownload(wb,d);
+  }catch(e){
+    console.error(e);
+    alert("Excel Exportમાં સમસ્યા:\n" + e.message);
+  }
+}
+
+
+/* =========================================================
+   PATRAK-B : PDF / Excel / Print (A4 Landscape) + સહી
+========================================================= */
+
+const PB_W = {sr:26, name:120, sem:44, item:24, tot:44};
+
+function pbExportData(){
+  const sem = PB.sem;
+  const year = document.getElementById("academicYear").value;
+  return {
+    school: document.getElementById("schoolName").value.trim(),
+    info: "ધોરણ " + selectedStandard + " | વર્ગ " + selectedDivision +
+          (year ? " | વર્ષ " + year : ""),
+    title: "સેમેસ્ટર-" + sem + " પત્રક-B (વ્યક્તિત્વ વિકાસ)",
+    landscape:true, headers:[], rows:[],
+    pb:true, sig:"class",
+    popupAt: sem===2 ? 10 : 20,
+    defPer: sem===2 ? 10 : 20
+  };
+}
+
+function pbTotals(){
+  return PB.sem===2
+    ? ["કુલ ગુણ સત્ર-1 (400)","કુલ ગુણ સત્ર-2 (400)","વાર્ષિક એકંદર (400 માંથી)"]
+    : ["કુલ ગુણ સત્ર-1 (400)"];
+}
+
+function pbPrintTable(from,to){
+  const two = PB.sem===2;
+  const list = students.slice(from||0, to===undefined ? students.length : to);
+  const tots = pbTotals();
+  const nameW = nameColW(students.map(function(x){ return x.name||""; }),11);
+  const width = PB_W.sr + nameW + PB_W.sem + 40*PB_W.item + tots.length*PB_W.tot;
+  const IH = 230;
+
+  let h = '<table class="pc" style="table-layout:fixed;width:' + width + 'px;min-width:0"><colgroup>' +
+    '<col style="width:' + PB_W.sr + 'px"><col style="width:' + nameW + 'px"><col style="width:' + PB_W.sem + 'px">';
+  for(let i=0;i<40;i++) h += '<col style="width:' + PB_W.item + 'px">';
+  tots.forEach(function(){ h += '<col style="width:' + PB_W.tot + 'px">'; });
+  h += '</colgroup><thead>';
+
+  h += '<tr><th rowspan="3">ક્રમ</th><th rowspan="3">વિદ્યાર્થીનું નામ</th><th rowspan="3">સત્ર</th>';
+  PB_GROUPS.forEach(function(g){
+    const span = g.subs.reduce(function(a,x){ return a + x.n; },0);
+    h += '<th colspan="' + span + '">' + escapeHtml(g.k) + '</th>';
+  });
+  tots.forEach(function(t){
+    h += '<th rowspan="3">' + rotTh(t,PB_W.tot-4,IH+50,"#000000",true) + '</th>';
+  });
+  h += '</tr><tr>';
+  PB_GROUPS.forEach(function(g){
+    g.subs.forEach(function(sb){ h += '<th colspan="' + sb.n + '" style="font-size:10px">' + escapeHtml(sb.t) + '</th>'; });
+  });
+  h += '</tr><tr>';
+  PB_ITEMS.forEach(function(t,i){
+    h += '<th>' + rotTh((i+1) + ". " + t,PB_W.item-2,IH,"#000000",false) + '</th>';
+  });
+  h += '</tr></thead><tbody>';
+
+  list.forEach(function(st){
+    const sr = st.srNo;
+    const terms = two ? [1,2] : [1];
+    terms.forEach(function(t,ri){
+      const rec = PB.data[sr][t];
+      h += '<tr>';
+      if(ri===0){
+        h += '<td rowspan="' + terms.length + '">' + sr + '</td>' +
+             '<td class="l" rowspan="' + terms.length + '">' + escapeHtml(st.name||"") + '</td>';
+      }
+      h += '<td>' + (t===1 ? "પ્રથમ" : "દ્વિતીય") + '</td>';
+      for(let i=0;i<40;i++) h += '<td>' + rec.items[i] + '</td>';
+
+      if(ri===0){
+        if(two){
+          const an = pbAnnual(sr);
+          h += '<td class="tt" rowspan="2">' + PB.data[sr][1].total + '</td>' +
+               '<td class="tt" rowspan="2">' + PB.data[sr][2].total + '</td>' +
+               '<td class="tt" rowspan="2">' + an + '</td>';
+        }else{
+          h += '<td class="tt">' + rec.total + '</td>';
+        }
+      }
+      h += '</tr>';
+    });
+  });
+
+  h += '</tbody></table>';
+  return h;
+}
+
+function pbPageHTML(d,from,to,ci,cn){
+  const info = d.info + (cn>1 ? " | વિદ્યાર્થી ભાગ " + (ci+1) + "/" + cn : "");
+  return '<div class="rpt">' + rptHead(d.school) +
+    '<div class="sub"><b>' + escapeHtml(d.title) + '</b></div>' +
+    '<div class="sub">' + escapeHtml(info) + '</div>' +
+    pbPrintTable(from,to) + sigFooterHTML(d.sig) + '</div>';
+}
+
+function pbExport(sem,action){
+  if(!PB){
+    alert("પહેલા પત્રક-B લોડ થવા દો.");
+    return;
+  }
+  const d = pbExportData();
+  if(action==="pdf") saveReportPdf(d);
+  else if(action==="excel") exportReportExcel(d);
+  else printReport(d);
+}
+
+async function exportPatrakBExcel(d){
+  try{
+    const two = PB.sem===2;
+    const tots = pbTotals();
+    const n = 3 + 40 + tots.length;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("પત્રક-B");
+    const thin = {style:"thin"};
+    const border = {top:thin,left:thin,bottom:thin,right:thin};
+
+    function head(c,rot){
+      c.font = {bold:true};
+      c.alignment = rot
+        ? {horizontal:"center",vertical:"middle",wrapText:true,textRotation:90}
+        : {horizontal:"center",vertical:"middle",wrapText:true};
+      c.border = border;
+    }
+
+    const hr = xlTitles(ws,wb,d,n);
+
+    ["ક્રમ","વિદ્યાર્થીનું નામ","સત્ર"].forEach(function(t,i){
+      ws.mergeCells(hr,i+1,hr+2,i+1);
+      const c = ws.getCell(hr,i+1);
+      c.value = t;
+      head(c,false);
+    });
+
+    let col = 4;
+    PB_GROUPS.forEach(function(g){
+      const span = g.subs.reduce(function(a,x){ return a + x.n; },0);
+      ws.mergeCells(hr,col,hr,col+span-1);
+      const gc = ws.getCell(hr,col);
+      gc.value = g.k;
+      head(gc,false);
+
+      let cc = col;
+      g.subs.forEach(function(sb){
+        ws.mergeCells(hr+1,cc,hr+1,cc+sb.n-1);
+        const sc = ws.getCell(hr+1,cc);
+        sc.value = sb.t;
+        head(sc,false);
+        cc += sb.n;
+      });
+      col += span;
+    });
+
+    PB_ITEMS.forEach(function(t,i){
+      const c = ws.getCell(hr+2,4+i);
+      c.value = (i+1) + ". " + t;
+      head(c,true);
+    });
+
+    tots.forEach(function(t,k){
+      ws.mergeCells(hr,44+k,hr+2,44+k);
+      const c = ws.getCell(hr,44+k);
+      c.value = t;
+      head(c,false);
+    });
+
+    ws.getRow(hr).height = 22;
+    ws.getRow(hr+1).height = 34;
+    ws.getRow(hr+2).height = 230;
+
+    // વિદ્યાર્થીની હરોળ
+    let rowNo = hr + 3;
+    students.forEach(function(st){
+      const sr = st.srNo;
+      const terms = two ? [1,2] : [1];
+      const top = rowNo;
+
+      terms.forEach(function(t,ri){
+        const rec = PB.data[sr][t];
+        const row = ws.getRow(rowNo);
+        row.height = 20;
+        if(ri===0){
+          row.getCell(1).value = Number(sr);
+          row.getCell(2).value = st.name || "";
+        }
+        row.getCell(3).value = t===1 ? "પ્રથમ" : "દ્વિતીય";
+        for(let i=0;i<40;i++){
+          row.getCell(4+i).value = rec.items[i]==="" ? null : rec.items[i];
+        }
+        for(let c=1;c<=n;c++){
+          const cell = row.getCell(c);
+          cell.border = border;
+          cell.alignment = {horizontal:(c===2)?"left":"center",vertical:"middle"};
+        }
+        rowNo++;
+      });
+
+      if(two){
+        ws.mergeCells(top,1,top+1,1);
+        ws.mergeCells(top,2,top+1,2);
+        const an = pbAnnual(sr);
+        [PB.data[sr][1].total, PB.data[sr][2].total, an].forEach(function(v,k){
+          ws.mergeCells(top,44+k,top+1,44+k);
+          const c = ws.getCell(top,44+k);
+          c.value = v==="" ? null : v;
+          c.font = {bold:true};
+          c.border = border;
+          c.alignment = {horizontal:"center",vertical:"middle"};
+        });
+      }else{
+        const c = ws.getCell(top,44);
+        c.value = PB.data[sr][1].total==="" ? null : PB.data[sr][1].total;
+        c.font = {bold:true};
+      }
+    });
+    const lastBody = rowNo - 1;
+
+    // સહી: ડાબી બાજુ વર્ગ શિક્ષક, જમણી બાજુ આચાર્ય
+    const fr = lastBody + 3;
+    ws.mergeCells(fr,1,fr,8);
+    const s1 = ws.getCell(fr,1);
+    s1.value = "વર્ગ શિક્ષકની સહી: ____________________";
+    s1.font = {bold:true};
+    s1.alignment = {horizontal:"left",vertical:"middle"};
+
+    ws.mergeCells(fr,n-9,fr,n);
+    const s2 = ws.getCell(fr,n-9);
+    s2.value = "આચાર્યની સહી: ____________________";
+    s2.font = {bold:true};
+    s2.alignment = {horizontal:"right",vertical:"middle"};
+    ws.getRow(fr).height = 26;
+
+    ws.getColumn(1).width = 6;
+    const bnW = nameColW(students.map(function(x){ return x.name||""; }),11);
+    ws.getColumn(2).width = Math.min(60,Math.max(26,Math.round(bnW/6)));
+    ws.getColumn(3).width = 9;
+    for(let i=0;i<40;i++) ws.getColumn(4+i).width = 4.6;
+    tots.forEach(function(t,k){ ws.getColumn(44+k).width = 11; });
+
+    ws.pageSetup = {
+      paperSize:9,
+      orientation:"landscape",
+      fitToPage:true,
+      fitToWidth:1,
+      fitToHeight:1,
+      horizontalCentered:true,
+      margins:{left:0.3,right:0.3,top:0.4,bottom:0.4,header:0.2,footer:0.2}
+    };
+
+    await xlDownload(wb,d);
+  }catch(e){
+    console.error(e);
+    alert("Excel Exportમાં સમસ્યા:\n" + e.message);
+  }
+}
+
+
+/* =========================================================
+   PATRAK-F (પ્રગતિપત્રક) - સેમેસ્ટર-1 અને સેમેસ્ટર-2
+   બધું પત્રક-C માંથી આપોઆપ | PDF/Print/Excel: બ્લેક એન્ડ વાઈટ, A4 આડું, 1 પેજમાં 2 કાર્ડ
+========================================================= */
+
+let PF = {sem:1, teacher:"", photos:{}};
+
+const FC_SCALE = [["80% થી 100%","A"],["65% થી 79%","B"],["50% થી 64%","C"],["35% થી 49%","D"],["35% થી ઓછા","E"]];
+const FC_RTE_HEAD = "RTE 2009 અંતર્ગત કલમ-29 મુજબ";
+const FC_RTE_BODY = "વિદ્યાર્થીની શૈક્ષણિક, સામાજિક, બૌદ્ધિક અને શારીરિક એમ સર્વગ્રાહી બાબતોની નોંધ, ઉપરાંત વિદ્યાર્થીના સતત અવલોકન અને સહ-અભ્યાસિક પ્રવૃતિઓ તથા સામાજિક પ્રવૃતિઓની નોંધ, ગુણો, વલણો રસ અને ત્રુટી વગેરેની વગેરેની જાણકારી શાળાકીય સર્વગ્રાહી મૂલ્યાંકનમાં સમાયેલી છે.";
+
+const FC_CSS = `
+.fpage{display:grid;grid-template-columns:510px 510px;gap:16px;align-items:start}
+.fc{width:510px;box-sizing:border-box;border:3px double #000;border-radius:12px;background:#fff;color:#000;font-family:Arial,"Noto Sans Gujarati",sans-serif;text-align:left;overflow:hidden}
+.fc .h{position:relative;padding:8px 14px;border-bottom:2px solid #000}
+.fc .lg{position:absolute;left:12px;top:8px;height:58px;width:auto;max-width:70px}
+.fc .c{text-align:center;font-weight:bold;line-height:1.35}
+.fc .c1{font-size:14px;padding:0 74px}
+.fc .c2{font-size:18px;padding:0 74px}
+.fc .pill{border:3px solid #000;border-radius:26px;text-align:center;font-weight:bold;font-size:17px;padding:6px 12px;margin:10px 0 8px}
+.fc .info{display:grid;grid-template-columns:1fr 1fr 108px;column-gap:8px;row-gap:6px;font-size:14px;align-items:center}
+.fc .info .m{text-align:center}
+.fc .info .w{grid-column:1 / span 2;white-space:nowrap}
+.fc .info .p{grid-column:3;grid-row:1 / span 4;text-align:center}
+.fc .ph{width:96px;height:112px;margin:0 auto;border:2px solid #000;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:12px;box-sizing:border-box}
+.fc .ph img{width:100%;height:100%;display:block}
+.fc .rl{font-size:13px;font-weight:bold;margin-top:4px;white-space:nowrap}
+.fc .rm{font-size:11px;cursor:pointer;text-decoration:underline}
+.fc table.ft{border-collapse:collapse;width:100%;margin:0;table-layout:fixed}
+.fc table.ft th{background:#000;color:#fff;font-size:13px;padding:5px 3px;border:1px solid #000;white-space:normal;text-align:center}
+.fc table.ft td{background:#fff;color:#000;font-size:14px;padding:5px 4px;border:1px solid #000;text-align:center;white-space:nowrap}
+.fc table.ft td.l{text-align:left}
+.fc table.ft tr.ov td{font-weight:bold;border-top:3px double #000}
+.fc .rte{border-top:2px solid #000;font-size:11px;line-height:1.45;padding:8px 14px;text-align:center}
+.fc .sg{border-top:1px solid #000;font-size:14px;padding:4px 16px 10px}
+.fc .sg div{margin-top:10px}
+.fc .sg .rt{text-align:right}
+.fc .vac{border-top:2px solid #000;font-size:12.5px;padding:6px 10px;line-height:1.6;text-align:center;font-weight:bold}
+`;
+
+/* ---------- ફોટા / લોગો ને બ્લેક એન્ડ વાઈટ (ગ્રેસ્કેલ) કરવા ---------- */
+
+const GRAY_CACHE = {};
+
+function grayOf(u){
+  return (u && GRAY_CACHE[u]) ? GRAY_CACHE[u] : u;
+}
+
+function allImgUrls(){
+  const out = [];
+  if(schoolExtra.logo) out.push(schoolExtra.logo);
+  Object.keys(PF.photos || {}).forEach(function(k){
+    const ph = PF.photos[k];
+    if(ph && ph.img) out.push(ph.img);
+  });
+  return out;
+}
+
+function warmGray(urls){
+  return Promise.all(urls.filter(function(u){ return u && !GRAY_CACHE[u]; }).map(function(u){
+    return new Promise(function(resolve){
+      if(typeof Image==="undefined"){ resolve(); return; }
+      const img = new Image();
+      img.onload = function(){
+        try{
+          const cv = document.createElement("canvas");
+          cv.width = img.width;
+          cv.height = img.height;
+          const cx = cv.getContext("2d");
+          cx.drawImage(img,0,0);
+          const id = cx.getImageData(0,0,cv.width,cv.height);
+          const px = id.data;
+          for(let i=0;i<px.length;i+=4){
+            const g = Math.round(0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2]);
+            px[i] = px[i+1] = px[i+2] = g;
+          }
+          cx.putImageData(id,0,0);
+          GRAY_CACHE[u] = cv.toDataURL(/^data:image\/jpeg/.test(u) ? "image/jpeg" : "image/png");
+        }catch(e){}
+        resolve();
+      };
+      img.onerror = function(){ resolve(); };
+      img.src = u;
+    });
+  }));
+}
+
+function metaRef(){
+  return db.collection("students").doc(currentUser.uid)
+    .collection("classes").doc(selectedStandard+"_"+selectedDivision)
+    .collection("marks").doc("classMeta");
+}
+
+function photosRef(){
+  return db.collection("students").doc(currentUser.uid)
+    .collection("classes").doc(selectedStandard+"_"+selectedDivision)
+    .collection("marks").doc("studentPhotos");
+}
+
+function nextDay(iso){
+  const m = String(iso||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return "";
+  const d = new Date(Date.UTC(Number(m[1]),Number(m[2])-1,Number(m[3])+1));
+  const p = function(n){ return String(n).padStart(2,"0"); };
+  return p(d.getUTCDate()) + "/" + p(d.getUTCMonth()+1) + "/" + d.getUTCFullYear();
+}
+
+function fcData(i){
+  const s = PC.students[i];
+  const sem = PC.sem;
+  const e = schoolExtra;
+  const nm = document.getElementById("schoolName").value.trim();
+  const year = document.getElementById("academicYear").value;
+
+  const rows = TRI_SUBJECTS.map(function(sb){
+    const k = PC.subs.findIndex(function(x){ return x.name===sb.name; });
+    return {name:sb.name, grade:(k>=0 ? (s.subj[k].grade || "") : "")};
+  });
+  rows.push({name:"વ્યક્તિત્વ વિકાસ", grade:(s.vv!=="" ? pcGrade(s.vv*100/400) : "")});
+
+  const from = sem===2 ? e.summerFrom : e.diwaliFrom;
+  const to = sem===2 ? e.summerTo : e.diwaliTo;
+  const vname = sem===2 ? "ઉનાળુ" : "દિવાળી";
+  const line = function(x){ return x || "__________"; };
+
+  const ph = PF.photos[s.sr];
+
+  return {
+    inst: e.institution || "",
+    school: nm,
+    title: sem===1 ? "શાળાકીય સર્વગ્રાહી મૂલ્યાંકન પ્રગતિપત્રક (પ્રથમ સત્ર)" : "શાળાકીય સર્વગ્રાહી મૂલ્યાંકન પ્રગતિપત્રક",
+    std: selectedStandard + "-" + selectedDivision,
+    year: year,
+    name: s.name, gr: s.gr, dob: s.dob,
+    days: PC.workDays, att: s.att, roll: s.sr,
+    photo: (ph && ph.name===s.name) ? ph.img : "",
+    rows: rows, overall: s.grade,
+    teacher: PF.teacher || "",
+    date: fmtDate(sem===2 ? e.sem2ResultDate : e.sem1ResultDate),
+    vac1: vname + " વેકેશન તા. " + line(fmtDate(from)) + " થી " + line(fmtDate(to)) + " સુધી રહેશે.",
+    vac2: "તા. " + line(nextDay(to)) + " થી શાળા રાબેતા મુજબ શરૂ થશે..."
+  };
+}
+
+function fcCardHTML(i,screen){
+  const c = fcData(i);
+  const E = function(x){ return escapeHtml(String(x===undefined || x===null ? "" : x)); };
+  const pick = function(u){ return screen ? u : grayOf(u); };
+
+  const logo = schoolExtra.logo ? '<img class="lg" src="' + pick(schoolExtra.logo) + '">' : '';
+
+  const photoBox = '<div class="ph"' + (screen ? ' onclick="pickPhoto(' + c.roll + ')" style="cursor:pointer" title="ફોટો પસંદ કરો"' : '') + '>' +
+    (c.photo ? '<img src="' + pick(c.photo) + '">' : '<span>' + (screen ? '📷 ફોટો' : '&nbsp;') + '</span>') + '</div>';
+
+  const rows = c.rows.map(function(r,k){
+    return '<tr><td>' + (k+1) + '</td><td class="l">' + E(r.name) + '</td><td><b>' + (r.grade || "-") + '</b></td><td>-</td>' +
+      (k<5 ? '<td>' + FC_SCALE[k][0] + '</td><td><b>' + FC_SCALE[k][1] + '</b></td>'
+           : (k===5 ? '<td colspan="2" rowspan="3"></td>' : '')) + '</tr>';
+  }).join("");
+
+  return '<div class="fc"><div class="h">' + logo +
+    (c.inst ? '<div class="c c1">' + E(c.inst) + '</div>' : '') +
+    '<div class="c c2">' + E(c.school) + '</div>' +
+    '<div class="pill">' + E(c.title) + '</div>' +
+    '<div class="info">' +
+      '<div>ધોરણ :- ' + E(c.std) + '</div><div class="m">વર્ષ:- ' + E(c.year) + '</div>' +
+      '<div class="p">' + photoBox + '<div class="rl">હાજરી નંબર :- ' + E(c.roll) + '</div>' +
+        ((screen && c.photo) ? '<div class="rm" onclick="removePhoto(' + c.roll + ')">✖ ફોટો કાઢો</div>' : '') + '</div>' +
+      '<div class="w">વિદ્યાર્થીનું નામ:- ' + E(c.name) + '</div>' +
+      '<div>જી.આર.નંબર :- ' + E(c.gr) + '</div><div class="m">જન્મ તારીખ :- ' + E(c.dob) + '</div>' +
+      '<div>કુલ કાર્ય દિવસ :- ' + E(c.days) + '</div><div class="m">હાજર દિવસ :- ' + E(c.att) + '</div>' +
+    '</div></div>' +
+    '<table class="ft"><colgroup><col style="width:36px"><col style="width:150px"><col style="width:70px"><col style="width:90px"><col style="width:110px"><col style="width:54px"></colgroup>' +
+    '<thead><tr><th>ક્રમ</th><th>વિષય</th><th>મેળવેલ ગ્રેડ</th><th>વિષય સંદર્ભે નોંધ</th><th colspan="2">ગ્રેડની સમજ</th></tr></thead><tbody>' +
+    rows +
+    '<tr class="ov"><td colspan="2">મેળવેલ એકંદરે ગ્રેડ</td><td colspan="4" style="font-size:16px">' + (c.overall || "-") + '</td></tr>' +
+    '</tbody></table>' +
+    '<div class="rte"><b>' + FC_RTE_HEAD + '</b><br>' + FC_RTE_BODY + '</div>' +
+    '<div class="sg"><div>વર્ગ શિક્ષકનું નામ :- ' + E(c.teacher) + '</div>' +
+    '<div>વર્ગ શિક્ષકની સહી :-</div>' +
+    '<div style="padding-left:40px">તારીખ :- ' + E(c.date) + '</div>' +
+    '<div class="rt">આચાર્યના સહી અને સિક્કો</div></div>' +
+    '<div class="vac">' + E(c.vac1) + '<br>' + E(c.vac2) + '</div>' +
+    '</div>';
+}
+
+function fcPageHTML(from,to){
+  let h = '<div class="rpt fpage">';
+  for(let i=from;i<to;i++) h += fcCardHTML(i,false);
+  return h + '</div>';
+}
+
+async function loadPatrakF(sem){
+  const box = document.getElementById("pf-sem"+sem);
+  const msg = await pcFetch(sem);
+  if(msg){
+    box.innerHTML = '<div class="info-box">' + escapeHtml(msg) + '</div>';
+    return;
+  }
+
+  try{
+    const sn = await metaRef().get();
+    PF.teacher = sn.exists ? (sn.data().teacher || "") : "";
+  }catch(e){
+    PF.teacher = "";
+  }
+
+  try{
+    const ps = await photosRef().get();
+    PF.photos = (ps.exists && ps.data().photos) ? ps.data().photos : {};
+  }catch(e){
+    PF.photos = {};
+  }
+
+  PF.sem = sem;
+  pfRender();
+}
+
+function pfRender(){
+  const sem = PF.sem;
+  const box = document.getElementById("pf-sem"+sem);
+
+  box.innerHTML = '<style>' + FC_CSS + '</style>' + `
+    <div class="info-box">બધું પત્રક-C (સેમેસ્ટર-${sem}) માંથી આપોઆપ આવે છે. <b>વર્ગ શિક્ષકનું નામ</b> એક વાર લખવાનું છે અને વિદ્યાર્થીના <b>ફોટા</b> પર દબાવી ફોટો પસંદ કરવાનો છે. PDF, Excel અને પ્રિન્ટ બ્લેક એન્ડ વાઈટ આવશે.</div>
+
+    <div class="form-grid">
+      <div class="full">
+        <label>વર્ગ શિક્ષકનું નામ</label>
+        <input id="pf${sem}_teacher" value="${escapeHtml(PF.teacher)}" placeholder="વર્ગ શિક્ષકનું નામ" onchange="onPfTeacher(${sem})">
+      </div>
+    </div>
+    <button class="save-btn" onclick="savePfTeacher(${sem})">💾 વર્ગ શિક્ષકનું નામ સાચવો</button>
+    <div id="pf${sem}_status" class="status"></div>
+
+    <input type="file" id="pfPhotoFile" accept="image/*" style="display:none" onchange="onPhotoSelected(event)">
+
+    <div id="pf${sem}_cards" style="display:flex;flex-direction:column;gap:14px;align-items:center;margin-top:14px;overflow-x:auto"></div>
+
+    <button class="save-btn" style="background:#147a35" onclick="loadPatrakF(${sem})">🔄 ફરી લોડ કરો</button>
+    <div class="export-bar">
+      <button class="action-btn pdf" onclick="pfExport(${sem},'pdf')">📄 PDF સેવ</button>
+      <button class="action-btn excel" onclick="pfExport(${sem},'excel')">📊 Excel Export</button>
+      <button class="action-btn print" onclick="pfExport(${sem},'print')">🖨️ પ્રિન્ટ</button>
+    </div>
+  `;
+  pfRenderCards();
+}
+
+function pfRenderCards(){
+  const el = document.getElementById("pf"+PF.sem+"_cards");
+  el.innerHTML = PC.students.map(function(x,i){ return fcCardHTML(i,true); }).join("");
+}
+
+function onPfTeacher(sem){
+  PF.teacher = document.getElementById("pf"+sem+"_teacher").value.trim();
+  pfRenderCards();
+}
+
+async function savePfTeacher(sem){
+  const status = document.getElementById("pf"+sem+"_status");
+  PF.teacher = document.getElementById("pf"+sem+"_teacher").value.trim();
+  try{
+    showLoading(true);
+    await metaRef().set({teacher:PF.teacher, updatedAt:firebase.firestore.FieldValue.serverTimestamp()},{merge:true});
+    status.style.color = "green";
+    status.innerText = "વર્ગ શિક્ષકનું નામ સચવાઈ ગયું.";
+  }catch(e){
+    status.style.color = "red";
+    status.innerText = firebaseError(e);
+  }finally{
+    showLoading(false);
+  }
+  pfRenderCards();
+}
+
+/* ---------- વિદ્યાર્થીનો ફોટો ---------- */
+
+function pickPhoto(sr){
+  PF.pickSr = sr;
+  const f = document.getElementById("pfPhotoFile");
+  if(f) f.click();
+}
+
+async function savePhotos(){
+  const status = document.getElementById("pf"+PF.sem+"_status");
+  try{
+    showLoading(true);
+    await photosRef().set({photos:PF.photos, updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    if(status){
+      status.style.color = "green";
+      status.innerText = "ફોટો સચવાઈ ગયો.";
+    }
+  }catch(e){
+    if(status){
+      status.style.color = "red";
+      status.innerText = firebaseError(e);
+    }
+  }finally{
+    showLoading(false);
+  }
+}
+
+function onPhotoSelected(ev){
+  const f = ev.target.files[0];
+  const sr = PF.pickSr;
+  ev.target.value = "";
+  if(!f || !sr) return;
+  if(!/^image\//.test(f.type)){
+    alert("ફક્ત ફોટો પસંદ કરો.");
+    return;
+  }
+
+  const stu = PC.students.find(function(x){ return x.sr===sr; });
+  if(!stu) return;
+
+  const rd = new FileReader();
+  rd.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      // 96x112 ના પ્રમાણમાં (cover) કાપીને નાનો કરવો
+      const W = 144, H = 168;
+      const cv = document.createElement("canvas");
+      cv.width = W;
+      cv.height = H;
+      const cx = cv.getContext("2d");
+      const k = Math.max(W/img.width, H/img.height);
+      const w = img.width*k, h = img.height*k;
+      cx.fillStyle = "#fff";
+      cx.fillRect(0,0,W,H);
+      cx.drawImage(img,(W-w)/2,(H-h)/2,w,h);
+      PF.photos[sr] = {name:stu.name, img:cv.toDataURL("image/jpeg",0.78)};
+      pfRenderCards();
+      savePhotos();
+    };
+    img.onerror = function(){ alert("ફોટો ખૂલી શક્યો નથી."); };
+    img.src = e.target.result;
+  };
+  rd.readAsDataURL(f);
+}
+
+function removePhoto(sr){
+  delete PF.photos[sr];
+  pfRenderCards();
+  savePhotos();
+}
+
+function pfExport(sem,action){
+  if(!PC || PC.sem!==sem){
+    alert("પહેલા ડેટા લોડ થવા દો. ('ફરી લોડ કરો' દબાવો)");
+    return;
+  }
+  const d = {
+    school:"", info:"", title:"સેમેસ્ટર-" + sem + " પત્રક-F (પ્રગતિપત્રક)",
+    landscape:true, headers:[], rows:[],
+    fcards:true, popupAt:1000000, defPer:30
+  };
+  if(action==="pdf") saveReportPdf(d);
+  else if(action==="excel") exportReportExcel(d);
+  else printReport(d);
+}
+
+/* ---------- Excel: બ્લેક એન્ડ વાઈટ, A4 Landscape, 1 પેજ = 2 કાર્ડ ---------- */
+
+async function exportPatrakFExcel(d){
+  try{
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("પત્રક-F");
+    const bl = {style:"thin",color:{argb:"FF000000"}};
+    const border = {top:bl,left:bl,bottom:bl,right:bl};
+    const thick = {style:"medium",color:{argb:"FF000000"}};
+    const widths = [5,20,11,13,16,12];
+
+    widths.forEach(function(w,k){
+      ws.getColumn(1+k).width = w;
+      ws.getColumn(8+k).width = w;
+    });
+    ws.getColumn(7).width = 3;
+
+    function put(r,L,c1,c2,text,st){
+      st = st || {};
+      const col = L + c1 - 1;
+      if(c2>c1) ws.mergeCells(r,col,r,L+c2-1);
+      const cell = ws.getCell(r,col);
+      cell.value = text;
+      cell.font = {bold:!!st.bold,size:st.size||11,color:{argb:st.color||"FF000000"}};
+      if(st.fill) cell.fill = {type:"pattern",pattern:"solid",fgColor:{argb:st.fill}};
+      cell.alignment = {horizontal:st.align||"center",vertical:"middle",wrapText:!!st.wrap};
+      cell.border = st.border || border;
+    }
+
+    function addImg(dataUrl,col0,row0,w,h){
+      try{
+        const g = grayOf(dataUrl);
+        const m = g.match(/^data:image\/(png|jpeg|jpg);base64,/);
+        const ext = m ? (m[1]==="jpg" ? "jpeg" : m[1]) : "png";
+        const id = wb.addImage({base64:g, extension:ext});
+        ws.addImage(id,{tl:{col:col0,row:row0},ext:{width:w,height:h}});
+      }catch(e){ console.log("img",e); }
+    }
+
+    function card(top,L,c){
+      const L0 = {align:"left"};
+      put(top,L,1,6,c.inst,{bold:true,size:12});
+      put(top+1,L,1,6,c.school,{bold:true,size:14});
+      put(top+2,L,1,6,c.title,{bold:true,size:12,border:{top:thick,left:thick,bottom:thick,right:thick}});
+      put(top+3,L,1,2,"ધોરણ :- " + c.std,L0);
+      put(top+3,L,3,4,"વર્ષ:- " + c.year,{});
+      ws.mergeCells(top+3,L+4,top+6,L+5);
+      ws.getCell(top+3,L+4).border = border;
+      put(top+4,L,1,4,"વિદ્યાર્થીનું નામ:- " + c.name,L0);
+      put(top+5,L,1,2,"જી.આર.નંબર :- " + c.gr,L0);
+      put(top+5,L,3,4,"જન્મ તારીખ :- " + c.dob,{});
+      put(top+6,L,1,2,"કુલ કાર્ય દિવસ :- " + c.days,L0);
+      put(top+6,L,3,4,"હાજર દિવસ :- " + c.att,{});
+      put(top+7,L,1,4,"",{});
+      put(top+7,L,5,6,"હાજરી નંબર :- " + c.roll,{bold:true});
+
+      const H = {bold:true,size:10,wrap:true,fill:"FF000000",color:"FFFFFFFF"};
+      put(top+8,L,1,1,"ક્રમ",H);
+      put(top+8,L,2,2,"વિષય",H);
+      put(top+8,L,3,3,"મેળવેલ ગ્રેડ",H);
+      put(top+8,L,4,4,"વિષય સંદર્ભે નોંધ",H);
+      put(top+8,L,5,6,"ગ્રેડની સમજ",H);
+
+      c.rows.forEach(function(r,k){
+        const rr = top + 9 + k;
+        put(rr,L,1,1,k+1,{});
+        put(rr,L,2,2,r.name,L0);
+        put(rr,L,3,3,r.grade || "-",{bold:true});
+        put(rr,L,4,4,"-",{});
+        if(k<5){
+          put(rr,L,5,5,FC_SCALE[k][0],{});
+          put(rr,L,6,6,FC_SCALE[k][1],{bold:true});
+        }
+      });
+      ws.mergeCells(top+14,L+4,top+16,L+5);
+      ws.getCell(top+14,L+4).border = border;
+
+      put(top+17,L,1,2,"મેળવેલ એકંદરે ગ્રેડ",{bold:true,border:{top:{style:"double",color:{argb:"FF000000"}},left:bl,bottom:bl,right:bl}});
+      put(top+17,L,3,6,c.overall || "-",{bold:true,size:13,border:{top:{style:"double",color:{argb:"FF000000"}},left:bl,bottom:bl,right:bl}});
+
+      put(top+18,L,1,6,FC_RTE_HEAD + "\n" + FC_RTE_BODY,{size:8,wrap:true});
+      put(top+19,L,1,6,"વર્ગ શિક્ષકનું નામ :- " + c.teacher,L0);
+      put(top+20,L,1,6,"વર્ગ શિક્ષકની સહી :-",L0);
+      put(top+21,L,1,6,"તારીખ :- " + c.date,{});
+      put(top+22,L,1,6,"આચાર્યના સહી અને સિક્કો",{align:"right"});
+      put(top+23,L,1,6,c.vac1,{bold:true,size:10});
+      put(top+24,L,1,6,c.vac2,{bold:true,size:10});
+
+      // લોગો (ડાબી બાજુ ઉપર) અને ફોટો (હાજરી નંબર પાસે)
+      if(schoolExtra.logo) addImg(schoolExtra.logo,L-1+0.1,top-1+0.1,50,50);
+      if(c.photo) addImg(c.photo,L-1+4+0.2,top-1+3+0.1,92,106);
+    }
+
+    const list = PC.students;
+    let top = 1;
+    for(let i=0;i<list.length;i+=2){
+      card(top,1,fcData(i));
+      if(i+1<list.length) card(top,8,fcData(i+1));
+
+      for(let r=top;r<top+25;r++) ws.getRow(r).height = 20;
+      ws.getRow(top).height = 30;
+      ws.getRow(top+1).height = 24;
+      ws.getRow(top+2).height = 26;
+      for(let r=top+3;r<=top+6;r++) ws.getRow(r).height = 28;
+      ws.getRow(top+18).height = 70;
+
+      const sp = ws.getRow(top+25);
+      if(typeof sp.addPageBreak==="function") sp.addPageBreak();
+      top += 26;
+    }
+
+    ws.pageSetup = {
+      paperSize:9,
+      orientation:"landscape",
+      fitToPage:true,
+      fitToWidth:1,
+      fitToHeight:0,
+      horizontalCentered:true,
+      margins:{left:0.3,right:0.3,top:0.4,bottom:0.4,header:0.2,footer:0.2}
+    };
+
+    await xlDownload(wb,d);
+  }catch(e){
+    console.error(e);
+    alert("Excel Exportમાં સમસ્યા:\n" + e.message);
+  }
+}
+
+</script>
+
+</body>
+</html>
