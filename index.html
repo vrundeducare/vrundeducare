@@ -23,12 +23,6 @@ try{
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
-<!-- ================= XLSX ================= -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-<!-- ================= EXCELJS ================= -->
-<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-
 <style>
 *{
     box-sizing:border-box;
@@ -543,6 +537,11 @@ td select{
         placeholder="પાસવર્ડ"
     >
 
+    <label style="display:flex;align-items:center;gap:10px;font-weight:normal;margin:14px 0 4px;cursor:pointer">
+        <input type="checkbox" id="rememberMe" style="width:22px;height:22px;padding:0;margin:0">
+        Remember me
+    </label>
+
     <button
         class="primary-btn"
         onclick="loginUser()">
@@ -761,16 +760,16 @@ td select{
         <div class="full">
 
             <label>
-                શાળાનો લોગો (PNG / JPEG)
+                સંસ્થાનો લોગો (PNG / JPEG)
             </label>
 
             <input
-                id="logoFile"
+                id="instLogoFile"
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
-                onchange="onLogoSelect(event)">
+                onchange="onLogoSelect(event,'inst')">
 
-            <div id="logoPreviewBox" style="margin-top:8px"></div>
+            <div id="instLogoPreviewBox" style="margin-top:8px"></div>
 
         </div>
 
@@ -785,6 +784,23 @@ td select{
                 id="institutionName"
                 placeholder="સંસ્થાનું નામ"
                 oninput="this.style.borderColor=''">
+
+        </div>
+
+
+        <div class="full">
+
+            <label>
+                શાળાનો લોગો (PNG / JPEG)
+            </label>
+
+            <input
+                id="logoFile"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onchange="onLogoSelect(event)">
+
+            <div id="logoPreviewBox" style="margin-top:8px"></div>
 
         </div>
 
@@ -1136,6 +1152,31 @@ td select{
         onchange="importExcel(event)">
 
 
+    <div class="student-actions" style="margin-top:-4px">
+
+        <button
+            class="action-btn import"
+            onclick="document.getElementById('photoFolder').click()">
+
+            📁 ફોટા ફોલ્ડર અપલોડ
+
+        </button>
+
+        <button
+            class="action-btn add"
+            onclick="document.getElementById('photoFiles').click()">
+
+            🖼️ ફોટા પસંદ કરો
+
+        </button>
+
+    </div>
+
+    <input id="photoFolder" type="file" webkitdirectory multiple accept="image/*" style="display:none" onchange="onPhotoFiles(event)">
+    <input id="photoFiles" type="file" multiple accept="image/*" style="display:none" onchange="onPhotoFiles(event)">
+    <div id="photoUploadStatus" class="status" style="margin-top:0;margin-bottom:12px"></div>
+
+
     <div class="table-wrap">
 
     <table>
@@ -1166,6 +1207,14 @@ td select{
 
                 <th>
                     કુમાર/કન્યા
+                </th>
+
+                <th>
+                    Swift Chat મુજબ નામ
+                </th>
+
+                <th>
+                    ફોટો
                 </th>
 
                 <th>
@@ -1321,6 +1370,18 @@ td select{
 
     </div>
 
+    <div
+        class="menu-card"
+        onclick="showPage('sem1-fp')">
+
+        <div class="menu-icon">📕</div>
+
+        <div class="menu-title">
+            Front Page
+        </div>
+
+    </div>
+
 
     <div
         class="menu-card"
@@ -1457,6 +1518,18 @@ td select{
 
     </div>
 
+    <div
+        class="menu-card"
+        onclick="showPage('sem2-fp')">
+
+        <div class="menu-icon">📕</div>
+
+        <div class="menu-title">
+            Front Page
+        </div>
+
+    </div>
+
 
     <div
         class="menu-card"
@@ -1491,6 +1564,26 @@ td select{
 <button class="back-btn" onclick="showPage('sem2')">← સેમેસ્ટર-2</button>
 <h2>🗓️ સેમેસ્ટર-2 હાજરી</h2>
 <div id="att-sem2"></div>
+</div>
+</section>
+
+
+<!-- ================= FRONT PAGE ================= -->
+
+<section id="sem1-fp" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem1')">← સેમેસ્ટર-1</button>
+<h2>📕 સેમેસ્ટર-1 Front Page</h2>
+<div id="fp-sem1"></div>
+</div>
+</section>
+
+
+<section id="sem2-fp" class="page">
+<div class="card">
+<button class="back-btn" onclick="showPage('sem2')">← સેમેસ્ટર-2</button>
+<h2>📕 સેમેસ્ટર-2 Front Page</h2>
+<div id="fp-sem2"></div>
 </div>
 </section>
 
@@ -1715,6 +1808,11 @@ const auth = firebase.auth();
 
 const db = firebase.firestore();
 
+/* દરેક વખતે નવેસરથી લોગ ઇન: જૂનો સચવાયેલો લોગ ઇન બંધ, અને લોગ ઇન ફોનમાં યાદ રહેતો નથી */
+let loginAllowed = false;
+auth.setPersistence(firebase.auth.Auth.Persistence.NONE).catch(function(){});
+auth.signOut().catch(function(){});
+
 
 /* =========================================================
    VARIABLES
@@ -1723,6 +1821,29 @@ const db = firebase.firestore();
 /* Browser storage (પ્રકાશિત પેજમાં ખાલી પણ હોઈ શકે) */
 function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+
+/* Remember me: ટીક કર્યું હોય તો ઇ-મેઇલ અને પાસવર્ડ આ ફોનમાં યાદ રહે (લોગ ઇન બટન દબાવવું જ પડે) */
+function saveRemember(email,password){
+  try{
+    if(document.getElementById("rememberMe").checked){
+      lsSet("rm",btoa(unescape(encodeURIComponent(JSON.stringify({e:email,p:password})))));
+    }else{
+      lsDel("rm");
+    }
+  }catch(e){}
+}
+
+function loadRemember(){
+  try{
+    const v = lsGet("rm");
+    if(!v) return;
+    const o = JSON.parse(decodeURIComponent(escape(atob(v))));
+    document.getElementById("email").value = o.e || "";
+    document.getElementById("password").value = o.p || "";
+    document.getElementById("rememberMe").checked = true;
+  }catch(e){}
+}
 
 let currentUser = null;
 
@@ -1733,7 +1854,7 @@ let selectedDivision = "";
 let students = [];
 
 let schoolExtra = {
-    institution:"", logo:"",
+    institution:"", logo:"", instLogo:"",
     sem1ResultDate:"", sem2ResultDate:"",
     diwaliFrom:"", diwaliTo:"", summerFrom:"", summerTo:""
 };
@@ -1795,12 +1916,22 @@ async function loginUser(){
 
     try{
 
+        loginAllowed = true;
+
+        await withTimeout(auth.setPersistence(
+            firebase.auth.Auth.Persistence.NONE
+        ),15000);
+
         await withTimeout(auth.signInWithEmailAndPassword(
             email,
             password
         ),30000);
 
+        saveRemember(email,password);
+
     }catch(error){
+
+        loginAllowed = false;
 
         showLoading(false);
 
@@ -1856,12 +1987,22 @@ async function registerUser(){
 
     try{
 
+        loginAllowed = true;
+
+        await withTimeout(auth.setPersistence(
+            firebase.auth.Auth.Persistence.NONE
+        ),15000);
+
         await withTimeout(auth.createUserWithEmailAndPassword(
             email,
             password
         ),30000);
 
+        saveRemember(email,password);
+
     }catch(error){
+
+        loginAllowed = false;
 
         showLoading(false);
 
@@ -1928,6 +2069,14 @@ async function resetPassword(){
 
 auth.onAuthStateChanged(async function(user){
 
+    if(user && !loginAllowed){
+
+        // જૂનો સચવાયેલો લોગ ઇન: સ્વીકારવો નહીં
+        auth.signOut().catch(function(){});
+        return;
+
+    }
+
     if(user){
 
         currentUser = user;
@@ -1942,9 +2091,7 @@ auth.onAuthStateChanged(async function(user){
         showLoading(false);
 
 
-        await loadSchoolInfo();
-
-        await loadStudents();
+        await Promise.all([loadSchoolInfo(), loadStudents()]);
 
     }else{
 
@@ -2012,6 +2159,8 @@ function showPage(pageId){
     if(pageId==="sem2-b") loadPatrakB(2);
     if(pageId==="sem1-f") loadPatrakF(1);
     if(pageId==="sem2-f") loadPatrakF(2);
+    if(pageId==="sem1-fp") loadFrontPage(1);
+    if(pageId==="sem2-fp") loadFrontPage(2);
     if(pageId==="sem1-att") renderAttendance(1);
     if(pageId==="sem2-att") renderAttendance(2);
     if(pageId==="sem1-swa") renderSwaForm(1);
@@ -2489,7 +2638,7 @@ function addStudentRow(data = {}){
                 type="text"
                 class="stu-gr"
                 value="${escapeHtml(data.gr || "")}"
-                placeholder="વ.પ.નં.">
+                placeholder="વ.પ.નં." oninput="refreshPhotoCell(this)">
 
         </td>
 
@@ -2562,6 +2711,20 @@ function addStudentRow(data = {}){
             </select>
 
         </td>
+
+
+        <td>
+
+            <input
+                type="text"
+                class="stu-swift"
+                value="${escapeHtml(data.swift || "")}"
+                placeholder="Swift Chat નામ">
+
+        </td>
+
+
+        <td class="stu-photo" style="font-weight:bold;white-space:nowrap">${photoStatusHTML(data.gr)}</td>
 
 
         <td>
@@ -2774,97 +2937,65 @@ async function saveStudents(){
     }
 
 
-    /* Validate rows */
+    /* Validate rows: Swift Chat નામ અને ફોટો સિવાય બધી કોલમ ભરેલી હોવી જોઈએ */
 
-    for(
-        let i=0;
-        i<rows.length;
-        i++
-    ){
+    document.querySelectorAll("#studentTableBody input, #studentTableBody select").forEach(function(el){
+        el.style.borderColor = "";
+    });
 
-        const row =
-            rows[i];
+    for(let i=0;i<rows.length;i++){
 
+        const row = rows[i];
 
-        const name =
-            row.querySelector(
-                ".stu-name"
-            ).value.trim();
+        const f = {
+            name: row.querySelector(".stu-name"),
+            gr: row.querySelector(".stu-gr"),
+            dob: row.querySelector(".stu-dob"),
+            category: row.querySelector(".stu-category"),
+            gender: row.querySelector(".stu-gender")
+        };
 
+        const labels = {
+            name:"વિદ્યાર્થીનું નામ",
+            gr:"વ.પ.નં.",
+            dob:"જન્મ તારીખ",
+            category:"કેટેગરી",
+            gender:"કુમાર/કન્યા"
+        };
 
-        const dob =
-            row.querySelector(
-                ".stu-dob"
-            ).value.trim();
+        const miss = [];
+        Object.keys(f).forEach(function(k){
+            if(!String(f[k].value).trim()){
+                miss.push(labels[k]);
+                f[k].style.borderColor = "#d00";
+            }
+        });
 
-
-        const category =
-            row.querySelector(
-                ".stu-category"
-            ).value;
-
-
-        const gender =
-            row.querySelector(
-                ".stu-gender"
-            ).value;
-
-
-        if(!name){
-
+        if(miss.length){
             alert(
-                "ક્રમ " +
-                (i+1) +
-                " નું વિદ્યાર્થીનું નામ નાખો."
+                "ક્રમ " + (i+1) + " માં આ ખાલી છે: " + miss.join(", ") +
+                "\n\nSwift Chat મુજબ નામ અને ફોટો સિવાયની બધી કોલમ ભરવી ફરજિયાત છે."
             );
-
+            f[Object.keys(f).find(function(k){ return !String(f[k].value).trim(); })].focus();
             return;
-
         }
 
-
-        if(dob && !validDOB(dob)){
-
-            alert(
-                "ક્રમ " +
-                (i+1) +
-                " ની જન્મ તારીખ DD/MM/YYYY માં સાચી નાખો."
-            );
-
+        if(!validDOB(f.dob.value.trim())){
+            f.dob.style.borderColor = "#d00";
+            alert("ક્રમ " + (i+1) + " ની જન્મ તારીખ DD/MM/YYYY માં સાચી નાખો.");
             return;
-
         }
 
-
-        if(
-            category &&
-            !validCategory(category)
-        ){
-
-            alert(
-                "ક્રમ " +
-                (i+1) +
-                " ની કેટેગરી ખોટી છે."
-            );
-
+        if(!validCategory(f.category.value)){
+            f.category.style.borderColor = "#d00";
+            alert("ક્રમ " + (i+1) + " ની કેટેગરી ખોટી છે.");
             return;
-
         }
 
-
-        if(
-            gender &&
-            !validGender(gender)
-        ){
-
-            alert(
-                "ક્રમ " +
-                (i+1) +
-                " નું BOY/GIRL ખોટું છે."
-            );
-
+        if(!validGender(f.gender.value)){
+            f.gender.style.borderColor = "#d00";
+            alert("ક્રમ " + (i+1) + " નું BOY/GIRL ખોટું છે.");
             return;
-
         }
 
     }
@@ -2941,6 +3072,14 @@ async function saveStudents(){
                     row
                         .querySelector(
                             ".stu-gr"
+                        )
+                        .value
+                        .trim(),
+
+                swift:
+                    row
+                        .querySelector(
+                            ".stu-swift"
                         )
                         .value
                         .trim(),
@@ -3135,6 +3274,8 @@ async function loadStudents(){
         });
 
 
+        await loadPhotoIndex();
+
         renderStudents();
 
 
@@ -3183,15 +3324,7 @@ async function downloadTemplate(){
 
     try{
 
-        if(typeof ExcelJS === "undefined"){
-
-            alert(
-                "Excel Template Library લોડ થઈ નથી. Internet ચાલુ રાખો અને ફરી પ્રયાસ કરો."
-            );
-
-            return;
-
-        }
+        try{ await ensureExcelJS(); }catch(e){ alert("Excel Library લોડ થઈ નથી. Internet ચાલુ રાખો અને ફરી પ્રયાસ કરો."); return; }
 
 
         const workbook =
@@ -3240,6 +3373,12 @@ async function downloadTemplate(){
                 header:"કુમાર/કન્યા",
                 key:"gender",
                 width:18
+            },
+
+            {
+                header:"Swift Chat મુજબ નામ",
+                key:"swift",
+                width:30
             }
 
         ];
@@ -3265,7 +3404,9 @@ async function downloadTemplate(){
 
                 category:"",
 
-                gender:""
+                gender:"",
+
+                swift:""
 
             });
 
@@ -3527,7 +3668,10 @@ async function downloadTemplate(){
    EXCEL IMPORT
 ========================================================= */
 
-function importExcel(event){
+async function importExcel(event){
+
+    try{ await ensureXLSX(); }catch(e){ alert("Excel Library લોડ થઈ નથી. Internet ચાલુ રાખો અને ફરી પ્રયાસ કરો."); event.target.value = ""; return; }
+
 
     const file =
         event.target.files[0];
@@ -3748,7 +3892,9 @@ function importExcel(event){
                                 gender
                             )
                             ? gender
-                            : ""
+                            : "",
+
+                        swift: String(row[6] || "").trim()
 
                     });
 
@@ -4075,15 +4221,7 @@ async function exportExcel(){
 
     try{
 
-        if(typeof ExcelJS === "undefined"){
-
-            alert(
-                "Excel Library લોડ થઈ નથી."
-            );
-
-            return;
-
-        }
+        try{ await ensureExcelJS(); }catch(e){ alert("Excel Library લોડ થઈ નથી. Internet ચાલુ રાખો અને ફરી પ્રયાસ કરો."); return; }
 
 
         const workbook =
@@ -4132,6 +4270,12 @@ async function exportExcel(){
                 header:"કુમાર/કન્યા",
                 key:"gender",
                 width:18
+            },
+
+            {
+                header:"Swift Chat મુજબ નામ",
+                key:"swift",
+                width:30
             }
 
         ];
@@ -4187,7 +4331,15 @@ async function exportExcel(){
                         .querySelector(
                             ".stu-gender"
                         )
+                        .value,
+
+                    swift:
+                        tr
+                        .querySelector(
+                            ".stu-swift"
+                        )
                         .value
+                        .trim()
 
                 });
 
@@ -4594,16 +4746,33 @@ async function onExamSubject(kind,sem){
   const p = kind+sem;
   const sid = document.getElementById(p+"_subject").value;
   const qEl = document.getElementById(p+"_qcount");
+  const tbl = document.getElementById(p+"_table");
+  const st = document.getElementById(p+"_status");
+
+  // આખું પેજ તાજું: જૂનું કોષ્ટક અને સંદેશ કાઢો
+  if(tbl) tbl.innerHTML = "";
+  if(st) st.innerText = "";
+  if(qEl) qEl.value = "";
   if(!sid || !qEl) return;
+
+  let saved = null;
   try{
+    showLoading(true);
     const snap = await examDocRef(kind,sem,sid).get();
-    if(snap.exists && typeof snap.data().qCount==="number"){
-      qEl.value = snap.data().qCount;
-    }
+    if(snap.exists) saved = snap.data();
   }catch(e){ console.log(e); }
+  finally{ showLoading(false); }
+
+  // વચ્ચે વિષય બદલાયો હોય તો અટકો
+  if(document.getElementById(p+"_subject").value !== sid) return;
+
+  if(saved && typeof saved.qCount==="number" && saved.qCount>0){
+    qEl.value = saved.qCount;
+    await createExamTable(kind,sem,saved);
+  }
 }
 
-async function createExamTable(kind,sem){
+async function createExamTable(kind,sem,preSaved){
   const p = kind+sem;
   const subjectId = document.getElementById(p+"_subject").value;
   const qn = parseInt(document.getElementById(p+"_qcount").value);
@@ -4615,13 +4784,15 @@ async function createExamTable(kind,sem){
   if(students.length===0){ alert("પહેલા વિદ્યાર્થીની માહિતી સાચવો."); return; }
 
   // જૂનો સાચવેલો ડેટા મેળવો
-  let saved = null;
-  try{
-    showLoading(true);
-    const snap = await examDocRef(kind,sem,subjectId).get();
-    if(snap.exists) saved = snap.data();
-  }catch(e){ console.log(e); }
-  finally{ showLoading(false); }
+  let saved = preSaved || null;
+  if(!preSaved){
+    try{
+      showLoading(true);
+      const snap = await examDocRef(kind,sem,subjectId).get();
+      if(snap.exists) saved = snap.data();
+    }catch(e){ console.log(e); }
+    finally{ showLoading(false); }
+  }
 
   let html = `<div class="table-wrap"><table class="tri-table"><thead><tr>
       <th>ક્રમ</th><th>વિદ્યાર્થીનું નામ</th>`;
@@ -4836,21 +5007,21 @@ function reportCSS(){
 .rpt table.pc td{padding:3px 2px}
 .rpt.stretch table.pc th{padding:2px}
 .rpt.stretch table.pc td{font-size:13px;padding:4px 3px}
-.rpt table.pc td.l{white-space:nowrap}` + FC_CSS;
+.rpt table.pc td.l{white-space:nowrap}` + FC_CSS + FP_CSS;
 }
 
 function rptHead(school,plain){
-  if(plain){
-    return '<div><h2>' + escapeHtml(school || "શાળા પરિણામ પોર્ટલ") + '</h2></div>';
-  }
-  const inst = schoolExtra.institution;
-  const lg = schoolExtra.logo ? grayOf(schoolExtra.logo) : "";
-  const logo = lg
-    ? '<img src="' + lg + '" style="position:absolute;left:0;top:0;height:54px;width:auto">'
-    : '';
-  return '<div style="position:relative;min-height:' + (lg ? 54 : 0) + 'px">' + logo +
+  const inst = (!plain && schoolExtra.institution) ? schoolExtra.institution : "";
+  const L = schoolExtra.instLogo ? grayOf(schoolExtra.instLogo) : "";
+  const R = schoolExtra.logo ? grayOf(schoolExtra.logo) : "";
+  const img = function(u){
+    return u ? '<img src="' + u + '" style="height:54px;width:auto;display:block;flex:0 0 auto">' : '';
+  };
+  const text = '<div style="text-align:center">' +
     (inst ? '<div class="sub" style="font-weight:bold;font-size:15px">' + escapeHtml(inst) + '</div>' : '') +
     '<h2>' + escapeHtml(school || "શાળા પરિણામ પોર્ટલ") + '</h2></div>';
+  if(!L && !R) return '<div>' + text + '</div>';
+  return '<div style="display:flex;justify-content:center;align-items:center;gap:14px">' + img(L) + text + img(R) + '</div>';
 }
 
 /* ---------- 90° ફેરવેલા હેડર (ફોટો તરીકે - PDF/પ્રિન્ટ/સ્ક્રીન બધામાં સરખા) ---------- */
@@ -5004,6 +5175,7 @@ function buildReportHTML(d,from,to,ci,cn){
 /* ---------- 1 પેજમાં કેટલા વિદ્યાર્થી (30 થી વધુ હોય ત્યારે પૂછે) ---------- */
 
 function reportCount(d){
+  if(d.fpage) return 1;
   return d.pages ? PC.students.length : (d.pb ? students.length : (d.fcards ? PC.students.length : d.rows.filter(function(r){ return !r.max; }).length));
 }
 
@@ -5062,6 +5234,8 @@ function reportBodies(d,per){
       d.pages.forEach(function(p,pi){
         out.push(pcPageHTML(d,p,pi,ch[0],ch[1],ci,chunks.length));
       });
+    }else if(d.fpage){
+      out.push(fpPageHTML());
     }else if(d.fcards){
       for(let k=ch[0];k<ch[1];k+=2) out.push(fcPageHTML(k,Math.min(ch[1],k+2)));
     }else if(d.pb){
@@ -5083,12 +5257,50 @@ function reportFileName(d,ext){
 
 function reportAvail(d){
   // A4 માં 10mm margin પછી વાપરી શકાય તેવી જગ્યા (96dpi px)
+  if(d.fcards) return {w:1092,h:771};   // 4mm margin: લગભગ આખું પેજ
   return d.landscape ? {w:1047,h:718} : {w:718,h:1047};
 }
 
 /* ખાના ઓછા હોય તો પહોળાઈ A4 જેટલી ભરી દે (મોટું અને સુંદર),
    ખાના/વિદ્યાર્થી વધુ હોય તો A4 માં ફિટ થાય તેટલું નાનું કરે */
+function fitEl(el){
+  try{
+    const maxL = Number(el.dataset.l || 1);
+    const minFs = Number(el.dataset.min || 6.5);
+    let fs = Number(el.dataset.max || 11);
+    el.style.fontSize = fs + "px";
+    el.style.lineHeight = "1.35";
+    for(let i=0;i<70 && fs>minFs;i++){
+      const hgt = el.getBoundingClientRect().height;
+      if(hgt <= fs*1.35*maxL + 2) break;
+      fs -= 0.25;
+      el.style.fontSize = fs + "px";
+    }
+  }catch(e){}
+}
+
 function fitReport(rpt,av){
+  if(rpt.classList.contains("fp")){
+    const wf = rpt.offsetWidth;
+    const hf = rpt.offsetHeight;
+    return {w:wf, h:hf, scale:Math.min(av.w/wf, av.h/hf)*0.99};
+  }
+
+  // પત્રક-F: 2 કાર્ડ આખા પેજમાં ફેલાય (કાર્ડ પહોળા થાય + અક્ષર મોટા થાય)
+  if(rpt.classList.contains("fpage")){
+    const fitAll = function(){ rpt.querySelectorAll(".fit").forEach(fitEl); };
+    fitAll();
+    let w0 = rpt.offsetWidth;
+    let h0 = rpt.offsetHeight;
+    const s0 = Math.min(av.w/w0, av.h/h0);
+    const cw = Math.floor((av.w/s0 - 20 - 16)/2) - 2;
+    if(cw>510) rpt.style.setProperty("--fcw",cw + "px");
+    fitAll();
+    w0 = rpt.offsetWidth;
+    h0 = rpt.offsetHeight;
+    return {w:w0, h:h0, scale:Math.min(av.w/w0, av.h/h0)*0.99};
+  }
+
   let w = rpt.offsetWidth;
   if(w < av.w){
     rpt.classList.add("stretch");
@@ -5123,10 +5335,10 @@ async function printReport(src){
   doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
     <title>${escapeHtml(d.title)}</title>
     <style>
-      @page{size:A4 ${orient};margin:10mm}
+      @page{size:A4 ${orient};margin:${d.fcards ? "4mm" : "10mm"}}
       *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
       html,body{margin:0;padding:0;background:#fff}
-      .pgb{overflow:hidden;margin:0 auto;page-break-after:always;break-after:page}
+      .pgb{overflow:visible;margin:0 auto;page-break-after:always;break-after:page}
       .pgb:last-child{page-break-after:auto;break-after:auto}
       .fitw{transform-origin:top left;display:block}
       ${reportCSS()}
@@ -5141,8 +5353,8 @@ async function printReport(src){
         const rpt = pg.querySelector(".rpt");
         const f = fitReport(rpt,av);
         pg.querySelector(".fitw").style.transform = "scale(" + f.scale + ")";
-        pg.style.width = Math.ceil(f.w*f.scale) + "px";
-        pg.style.height = Math.ceil(f.h*f.scale) + "px";
+        pg.style.width = (Math.ceil(f.w*f.scale) + 4) + "px";
+        pg.style.height = (Math.ceil(f.h*f.scale) + 4) + "px";
       });
 
       iframe.contentWindow.focus();
@@ -5156,6 +5368,23 @@ async function printReport(src){
 }
 
 /* ---------- PDF SAVE (A4, fit to page) ---------- */
+
+async function ensureExcelJS(){
+  if(typeof ExcelJS === "undefined"){
+    await loadScriptOnce("https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js");
+  }
+}
+
+async function ensureXLSX(){
+  if(typeof XLSX === "undefined"){
+    await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js");
+  }
+}
+
+function setLoadingText(t){
+  const el = document.querySelector("#loading .loading-box");
+  if(el) el.innerText = t || "કૃપા કરીને રાહ જુઓ...";
+}
 
 function loadScriptOnce(url){
   return new Promise(function(resolve,reject){
@@ -5208,11 +5437,13 @@ async function saveReportPdf(src){
 
     const pw = pdf.internal.pageSize.getWidth();
     const ph = pdf.internal.pageSize.getHeight();
-    const aw = pw - 20;
-    const ah = ph - 20;
-    const SC = 3;
+    const mg = d.fcards ? 4 : 10;
+    const aw = pw - 2*mg;
+    const ah = ph - 2*mg;
+    const SC = d.fcards ? 2 : 3;
 
     for(let i=0;i<bodies.length;i++){
+      setLoadingText("PDF બને છે: " + (i+1) + " / " + bodies.length);
       holder.innerHTML = "<style>" + reportCSS() + "</style>" + bodies[i];
       await new Promise(function(r){ setTimeout(r,250); });
 
@@ -5226,12 +5457,12 @@ async function saveReportPdf(src){
 
       const nw = canvas.width/SC*25.4/96;
       const nh = canvas.height/SC*25.4/96;
-      const k = Math.min(1, aw/nw, ah/nh);
+      const k = (d.fcards || d.fpage) ? Math.min(aw/nw, ah/nh) : Math.min(1, aw/nw, ah/nh);
       const w = nw*k;
       const h = nh*k;
 
       if(i>0) pdf.addPage();
-      pdf.addImage(canvas.toDataURL("image/png"), "PNG", (pw-w)/2, 10, w, h);
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", (pw-w)/2, mg, w, h);
     }
 
     pdf.save(reportFileName(d,"pdf"));
@@ -5240,6 +5471,7 @@ async function saveReportPdf(src){
     alert("PDF બનાવવામાં સમસ્યા: " + e.message);
   }finally{
     holder.remove();
+    setLoadingText("");
     showLoading(false);
   }
 }
@@ -5247,6 +5479,46 @@ async function saveReportPdf(src){
 /* ---------- EXCEL EXPORT (A4, fit to 1 page) ---------- */
 
 /* Excel: ઉપરના શીર્ષક (સંસ્થા, શાળા, લોગો...) - આગળ હેડર ક્યાંથી શરૂ થાય તે હરોળ આપે */
+/* Excel માં કોલમની પહોળાઈ (px) અને સ્થાન */
+function xlPx(ws,a,b){
+  let t = 0;
+  for(let c=a;c<=b;c++) t += ((ws.getColumn(c).width) || 8.43)*7 + 5;
+  return t;
+}
+
+function xlColAt(ws,n,x){
+  let acc = 0;
+  for(let c=1;c<=n;c++){
+    const w = ((ws.getColumn(c).width) || 8.43)*7 + 5;
+    if(x < acc+w) return (c-1) + Math.max(0,x-acc)/w;
+    acc += w;
+  }
+  return n - 0.01;
+}
+
+function xlPlaceImg(ws,wb,n,url,x,row0,size){
+  if(!url) return;
+  try{
+    const g = grayOf(url);
+    const m = g.match(/^data:image\/(png|jpeg|jpg);base64,/);
+    const ext = m ? (m[1]==="jpg" ? "jpeg" : m[1]) : "png";
+    const id = wb.addImage({base64:g, extension:ext});
+    ws.addImage(id,{tl:{col:xlColAt(ws,n,Math.max(2,x)),row:row0},ext:{width:size,height:size}});
+  }catch(e){ console.log("logo",e); }
+}
+
+/* હેડરના લખાણની નજીક: ડાબે સંસ્થાનો લોગો, જમણે શાળાનો લોગો */
+function xlAddLogos(ws,wb,n,d){
+  if(!schoolExtra.instLogo && !schoolExtra.logo) return;
+  const tot = xlPx(ws,1,n);
+  let mx = (d.school || "").length;
+  if(schoolExtra.institution && !d.plain) mx = Math.max(mx,schoolExtra.institution.length);
+  const tw = Math.min(tot*0.85, mx*15);
+  const size = 54, gap = 10;
+  xlPlaceImg(ws,wb,n,schoolExtra.instLogo,tot/2 - tw/2 - gap - size,0.1,size);
+  xlPlaceImg(ws,wb,n,schoolExtra.logo,tot/2 + tw/2 + gap,0.1,size);
+}
+
 function xlTitles(ws,wb,d,n){
   const lines = [];
   if(schoolExtra.institution && !d.plain) lines.push([schoolExtra.institution,13]);
@@ -5265,16 +5537,6 @@ function xlTitles(ws,wb,d,n){
     ws.getRow(r).height = Math.max(20,t[1]+8);
   });
 
-  if(schoolExtra.logo && !d.plain){
-    try{
-      const lg = grayOf(schoolExtra.logo);
-      const m = lg.match(/^data:image\/(png|jpeg|jpg);base64,/);
-      const ext = m ? (m[1]==="jpg" ? "jpeg" : m[1]) : "png";
-      const id = wb.addImage({base64:lg, extension:ext});
-      ws.addImage(id,{tl:{col:0.1,row:0.1},ext:{width:58,height:58}});
-    }catch(e){ console.log("Logo error",e); }
-  }
-
   return lines.length + 2;
 }
 
@@ -5282,13 +5544,13 @@ async function exportReportExcel(src){
   const d = typeof src==="string" ? getReportData(src) : src;
   if(!d) return;
 
-  if(typeof ExcelJS === "undefined"){
-    alert("Excel Library લોડ થઈ નથી. Internet ચાલુ રાખો અને ફરી પ્રયાસ કરો.");
-    return;
-  }
+  try{ await ensureExcelJS(); }catch(e){ alert("Excel Library લોડ થઈ નથી. Internet ચાલુ રાખો અને ફરી પ્રયાસ કરો."); return; }
 
   await warmGray(allImgUrls());
 
+  if(d.fpage){
+    return exportFrontPageExcel(d);
+  }
   if(d.fcards){
     return exportPatrakFExcel(d);
   }
@@ -5389,6 +5651,8 @@ async function exportReportExcel(src){
       horizontalCentered:true,
       margins:{left:0.4,right:0.4,top:0.5,bottom:0.5,header:0.3,footer:0.3}
     };
+
+    xlAddLogos(ws,wb,n,d);
 
     const buffer = await wb.xlsx.writeBuffer();
     const blob = new Blob([buffer],{
@@ -5736,6 +6000,7 @@ function readSchoolExtra(){
   return {
     institution:schoolExtra.institution,
     logo:schoolExtra.logo || "",
+    instLogo:schoolExtra.instLogo || "",
     sem1ResultDate:schoolExtra.sem1ResultDate,
     sem2ResultDate:schoolExtra.sem2ResultDate,
     diwaliFrom:schoolExtra.diwaliFrom,
@@ -5749,6 +6014,7 @@ function applySchoolExtra(data){
   const set = function(id,v){ const el = document.getElementById(id); if(el) el.value = v || ""; };
   schoolExtra.institution = data.institution || "";
   schoolExtra.logo = data.logo || "";
+  schoolExtra.instLogo = data.instLogo || "";
   schoolExtra.sem1ResultDate = data.sem1ResultDate || "";
   schoolExtra.sem2ResultDate = data.sem2ResultDate || "";
   schoolExtra.diwaliFrom = data.diwaliFrom || "";
@@ -5766,7 +6032,8 @@ function applySchoolExtra(data){
   renderLogoPreview();
 }
 
-function onLogoSelect(ev){
+function onLogoSelect(ev,which){
+  const key = which==="inst" ? "instLogo" : "logo";
   const f = ev.target.files[0];
   if(!f) return;
   if(!/^image\//.test(f.type)){
@@ -5788,7 +6055,7 @@ function onLogoSelect(ev){
       cv.width = w;
       cv.height = h;
       cv.getContext("2d").drawImage(img,0,0,w,h);
-      schoolExtra.logo = f.type==="image/jpeg" ? cv.toDataURL("image/jpeg",0.9) : cv.toDataURL("image/png");
+      schoolExtra[key] = f.type==="image/jpeg" ? cv.toDataURL("image/jpeg",0.9) : cv.toDataURL("image/png");
       renderLogoPreview();
     };
     img.onerror = function(){ alert("ફોટો ખૂલી શક્યો નથી."); };
@@ -5799,17 +6066,19 @@ function onLogoSelect(ev){
 }
 
 function renderLogoPreview(){
-  const box = document.getElementById("logoPreviewBox");
-  if(!box) return;
-  box.innerHTML = schoolExtra.logo
-    ? '<img src="' + schoolExtra.logo + '" style="height:70px;max-width:200px;object-fit:contain;border:1px solid #ccc;border-radius:8px;padding:4px;vertical-align:middle"> ' +
-      '<button class="delete-btn" style="margin-left:8px" onclick="removeLogo()">લોગો કાઢો</button>' +
-      '<div style="font-size:13px;color:#555;margin-top:4px">"શાળાની વિગત સાચવો" દબાવો ત્યારે લોગો સચવાશે.</div>'
-    : '';
+  [["logo","logoPreviewBox","school"],["instLogo","instLogoPreviewBox","inst"]].forEach(function(x){
+    const box = document.getElementById(x[1]);
+    if(!box) return;
+    box.innerHTML = schoolExtra[x[0]]
+      ? '<img src="' + schoolExtra[x[0]] + '" style="height:70px;max-width:200px;object-fit:contain;border:1px solid #ccc;border-radius:8px;padding:4px;vertical-align:middle"> ' +
+        '<button class="delete-btn" style="margin-left:8px" onclick="removeLogo(\'' + x[2] + '\')">લોગો કાઢો</button>' +
+        '<div style="font-size:13px;color:#555;margin-top:4px">"શાળાની વિગત સાચવો" દબાવો ત્યારે લોગો સચવાશે.</div>'
+      : '';
+  });
 }
 
-function removeLogo(){
-  schoolExtra.logo = "";
+function removeLogo(which){
+  schoolExtra[which==="inst" ? "instLogo" : "logo"] = "";
   renderLogoPreview();
 }
 
@@ -6840,6 +7109,8 @@ async function exportPatrakExcel(d){
       margins:{left:0.3,right:0.3,top:0.5,bottom:0.5,header:0.3,footer:0.3}
     };
 
+    xlAddLogos(ws,wb,n,d);
+
     await xlDownload(wb,d);
   }catch(e){
     console.error(e);
@@ -7096,8 +7367,10 @@ async function exportPatrakBExcel(d){
       fitToWidth:1,
       fitToHeight:1,
       horizontalCentered:true,
-      margins:{left:0.3,right:0.3,top:0.4,bottom:0.4,header:0.2,footer:0.2}
+      margins:{left:0.15,right:0.15,top:0.15,bottom:0.15,header:0.1,footer:0.1}
     };
+
+    xlAddLogos(ws,wb,n,d);
 
     await xlDownload(wb,d);
   }catch(e){
@@ -7116,35 +7389,65 @@ let PF = {sem:1, teacher:"", photos:{}};
 
 const FC_SCALE = [["80% થી 100%","A"],["65% થી 79%","B"],["50% થી 64%","C"],["35% થી 49%","D"],["35% થી ઓછા","E"]];
 const FC_RTE_HEAD = "RTE 2009 અંતર્ગત કલમ-29 મુજબ";
-const FC_RTE_BODY = "વિદ્યાર્થીની શૈક્ષણિક, સામાજિક, બૌદ્ધિક અને શારીરિક એમ સર્વગ્રાહી બાબતોની નોંધ, ઉપરાંત વિદ્યાર્થીના સતત અવલોકન અને સહ-અભ્યાસિક પ્રવૃતિઓ તથા સામાજિક પ્રવૃતિઓની નોંધ, ગુણો, વલણો રસ અને ત્રુટી વગેરેની વગેરેની જાણકારી શાળાકીય સર્વગ્રાહી મૂલ્યાંકનમાં સમાયેલી છે.";
+const FC_RTE_BODY = "વિદ્યાર્થીની શૈક્ષણિક, સામાજિક, બૌદ્ધિક અને શારીરિક એમ સર્વગ્રાહી બાબતોની નોંધ, ઉપરાંત વિદ્યાર્થીના સતત અવલોકન અને સહ-અભ્યાસિક પ્રવૃતિઓ તથા સામાજિક પ્રવૃતિઓની નોંધ, ગુણો, વલણો રસ અને ત્રુટી વગેરેની જાણકારી શાળાકીય સર્વગ્રાહી મૂલ્યાંકનમાં સમાયેલી છે.";
 
 const FC_CSS = `
-.fpage{display:grid;grid-template-columns:510px 510px;gap:16px;align-items:start}
-.fc{width:510px;box-sizing:border-box;border:3px double #000;border-radius:12px;background:#fff;color:#000;font-family:Arial,"Noto Sans Gujarati",sans-serif;text-align:left;overflow:hidden}
-.fc .h{position:relative;padding:8px 14px;border-bottom:2px solid #000}
-.fc .lg{position:absolute;left:12px;top:8px;height:58px;width:auto;max-width:70px}
+.fpage{position:relative;display:grid;grid-template-columns:var(--fcw,510px) var(--fcw,510px);gap:16px;align-items:stretch;padding:10px}
+.fpage .cut{position:absolute;left:50%;top:6px;bottom:6px;border-left:2px dashed #000;transform:translateX(-1px)}
+.fpage .cut svg{position:absolute;top:24px;left:-12px;background:#fff}
+.fc{width:var(--fcw,510px);box-sizing:border-box;border:3px double #000;border-radius:12px;background:#fff;color:#000;font-family:Arial,"Noto Sans Gujarati",sans-serif;text-align:left;overflow:hidden}
+.fc .h{padding:8px 14px;border-bottom:2px solid #000}
+.fc .top{display:flex;align-items:center;justify-content:center;gap:10px}
+.fc .lg{height:54px;width:auto;max-width:70px;flex:0 0 auto}
+.fc .tx{flex:1 1 auto;text-align:center}
 .fc .c{text-align:center;font-weight:bold;line-height:1.35}
-.fc .c1{font-size:14px;padding:0 74px}
-.fc .c2{font-size:18px;padding:0 74px}
-.fc .pill{border:3px solid #000;border-radius:26px;text-align:center;font-weight:bold;font-size:17px;padding:6px 12px;margin:10px 0 8px}
-.fc .info{display:grid;grid-template-columns:1fr 1fr 108px;column-gap:8px;row-gap:6px;font-size:14px;align-items:center}
+.fc .c1{font-size:14px}
+.fc .c2{font-size:18px}
+.fc .pill{display:table;margin:6px auto 8px;border:2.5px solid #000;border-radius:20px;text-align:center;font-weight:bold;font-size:14.5px;padding:4px 20px}
+.fc .info{display:grid;grid-template-columns:1fr 1.1fr 108px;column-gap:8px;row-gap:5px;align-items:center}
+.fc .info>div{white-space:nowrap}
+.fc .info .fit{white-space:normal}
+.fc .info .a{font-size:16px}
+.fc .info .b{font-size:14px}
 .fc .info .m{text-align:center}
-.fc .info .w{grid-column:1 / span 2;white-space:nowrap}
-.fc .info .p{grid-column:3;grid-row:1 / span 4;text-align:center}
-.fc .ph{width:96px;height:112px;margin:0 auto;border:2px solid #000;border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:12px;box-sizing:border-box}
+.fc .info .w{grid-column:1 / span 2}
+.fc .info .p{grid-column:3;grid-row:1 / span 4;text-align:center;align-self:start}
+.fc .ph{width:96px;height:112px;margin:0 auto;border:2px solid #000;border-radius:8px;overflow:hidden;box-sizing:border-box}
+.fc .ph.e{visibility:hidden}
 .fc .ph img{width:100%;height:100%;display:block}
-.fc .rl{font-size:13px;font-weight:bold;margin-top:4px;white-space:nowrap}
-.fc .rm{font-size:11px;cursor:pointer;text-decoration:underline}
+.fc .rl{font-size:13px;margin-top:4px;white-space:nowrap}
 .fc table.ft{border-collapse:collapse;width:100%;margin:0;table-layout:fixed}
 .fc table.ft th{background:#000;color:#fff;font-size:13px;padding:5px 3px;border:1px solid #000;white-space:normal;text-align:center}
-.fc table.ft td{background:#fff;color:#000;font-size:14px;padding:5px 4px;border:1px solid #000;text-align:center;white-space:nowrap}
+.fc table.ft td{background:#fff;color:#000;font-size:14px;font-weight:normal;padding:5px 4px;border:1px solid #000;text-align:center;white-space:nowrap}
 .fc table.ft td.l{text-align:left}
 .fc table.ft tr.ov td{font-weight:bold;border-top:3px double #000}
-.fc .rte{border-top:2px solid #000;font-size:11px;line-height:1.45;padding:8px 14px;text-align:center}
+.fc .rte{border-top:2px solid #000;padding:6px 14px;text-align:center;font-size:10px}
+.fc .rte .t{font-size:9.5px;line-height:1.35;margin-top:2px}
 .fc .sg{border-top:1px solid #000;font-size:14px;padding:4px 16px 10px}
 .fc .sg div{margin-top:10px}
 .fc .sg .rt{text-align:right}
-.fc .vac{border-top:2px solid #000;font-size:12.5px;padding:6px 10px;line-height:1.6;text-align:center;font-weight:bold}
+.fc .vac{border-top:2px solid #000;padding:6px 10px;text-align:center;font-weight:bold}
+.fc .vac .t{font-size:11.5px;line-height:1.35}
+`;
+
+const FP_CSS = `
+.rpt.fp{display:block;width:718px;box-sizing:border-box;font-family:Arial,"Noto Sans Gujarati",sans-serif;color:#000;background:#fff;padding:10px 9px}
+.fp .fno{text-align:right;font-weight:bold;font-size:16px}
+.fp .bar{border:3px double #000;border-radius:8px;text-align:center;font-weight:bold;padding:8px 10px;margin:8px 0}
+.fp .b0{background:#000;color:#fff;font-size:24px;letter-spacing:1px}
+.fp .b1{font-size:24px}
+.fp .b2{font-size:22px}
+.fp .b2 small{display:block;font-size:15px;margin-top:3px;font-weight:normal}
+.fp .ttl{border:3px solid #000;border-radius:28px;text-align:center;font-weight:bold;font-size:22px;padding:8px 10px;margin:10px 30px}
+.fp .lgbox{display:flex;justify-content:center;align-items:center;gap:50px;margin:12px 0}
+.fp .lgbox img{height:100px;width:auto}
+.rpt.fp table{border-collapse:collapse;table-layout:fixed;margin:14px auto 0;width:auto}
+.rpt.fp table td,.rpt.fp table th{border:1.5px solid #000;color:#000;background:#fff;font-size:14px;padding:4px 3px;text-align:center;white-space:nowrap}
+.rpt.fp table th{font-weight:bold;white-space:normal;padding:2px}
+.rpt.fp table.fi td{font-size:16px;font-weight:bold;text-align:left;padding:6px 10px;border-width:2px}
+.rpt.fp table td.l{text-align:left;padding-left:6px}
+.rpt.fp table td.b{font-weight:bold}
+.fp .sgn{display:flex;justify-content:space-between;margin-top:46px;font-size:17px;font-weight:bold;padding:0 30px}
 `;
 
 /* ---------- ફોટા / લોગો ને બ્લેક એન્ડ વાઈટ (ગ્રેસ્કેલ) કરવા ---------- */
@@ -7158,6 +7461,7 @@ function grayOf(u){
 function allImgUrls(){
   const out = [];
   if(schoolExtra.logo) out.push(schoolExtra.logo);
+  if(schoolExtra.instLogo) out.push(schoolExtra.instLogo);
   Object.keys(PF.photos || {}).forEach(function(k){
     const ph = PF.photos[k];
     if(ph && ph.img) out.push(ph.img);
@@ -7200,10 +7504,16 @@ function metaRef(){
     .collection("marks").doc("classMeta");
 }
 
-function photosRef(){
+function photosCol(){
   return db.collection("students").doc(currentUser.uid)
     .collection("classes").doc(selectedStandard+"_"+selectedDivision)
-    .collection("marks").doc("studentPhotos");
+    .collection("photos");
+}
+
+function photoIndexRef(){
+  return db.collection("students").doc(currentUser.uid)
+    .collection("classes").doc(selectedStandard+"_"+selectedDivision)
+    .collection("marks").doc("photoIndex");
 }
 
 function nextDay(iso){
@@ -7232,7 +7542,7 @@ function fcData(i){
   const vname = sem===2 ? "ઉનાળુ" : "દિવાળી";
   const line = function(x){ return x || "__________"; };
 
-  const ph = PF.photos[s.sr];
+  const ph = PF.photos[grKey(s.gr)];
 
   return {
     inst: e.institution || "",
@@ -7242,7 +7552,7 @@ function fcData(i){
     year: year,
     name: s.name, gr: s.gr, dob: s.dob,
     days: PC.workDays, att: s.att, roll: s.sr,
-    photo: (ph && ph.name===s.name) ? ph.img : "",
+    photo: ph ? (ph.img || "") : "",
     rows: rows, overall: s.grade,
     teacher: PF.teacher || "",
     date: fmtDate(sem===2 ? e.sem2ResultDate : e.sem1ResultDate),
@@ -7255,47 +7565,53 @@ function fcCardHTML(i,screen){
   const c = fcData(i);
   const E = function(x){ return escapeHtml(String(x===undefined || x===null ? "" : x)); };
   const pick = function(u){ return screen ? u : grayOf(u); };
+  // નામ/વિગતનું લેબલ bold, પાછળનું લખાણ normal
+  const lv = function(l,v){ return '<b>' + l + '</b> ' + E(v); };
 
-  const logo = schoolExtra.logo ? '<img class="lg" src="' + pick(schoolExtra.logo) + '">' : '';
+  const lgI = schoolExtra.instLogo ? '<img class="lg" src="' + pick(schoolExtra.instLogo) + '">' : '';
+  const lgS = schoolExtra.logo ? '<img class="lg" src="' + pick(schoolExtra.logo) + '">' : '';
 
-  const photoBox = '<div class="ph"' + (screen ? ' onclick="pickPhoto(' + c.roll + ')" style="cursor:pointer" title="ફોટો પસંદ કરો"' : '') + '>' +
-    (c.photo ? '<img src="' + pick(c.photo) + '">' : '<span>' + (screen ? '📷 ફોટો' : '&nbsp;') + '</span>') + '</div>';
+  // ફોટો હોય કે ન હોય જગ્યા સરખી (ન હોય તો અદૃશ્ય બોક્સ) - કાર્ડની સાઈઝ હંમેશા સરખી
+  const photoBox = '<div class="ph' + (c.photo ? '' : ' e') + '">' + (c.photo ? '<img src="' + pick(c.photo) + '">' : '') + '</div>';
 
   const rows = c.rows.map(function(r,k){
-    return '<tr><td>' + (k+1) + '</td><td class="l">' + E(r.name) + '</td><td><b>' + (r.grade || "-") + '</b></td><td>-</td>' +
-      (k<5 ? '<td>' + FC_SCALE[k][0] + '</td><td><b>' + FC_SCALE[k][1] + '</b></td>'
+    return '<tr><td>' + (k+1) + '</td><td class="l">' + E(r.name) + '</td><td>' + (r.grade || "-") + '</td><td>-</td>' +
+      (k<5 ? '<td>' + FC_SCALE[k][0] + '</td><td>' + FC_SCALE[k][1] + '</td>'
            : (k===5 ? '<td colspan="2" rowspan="3"></td>' : '')) + '</tr>';
   }).join("");
 
-  return '<div class="fc"><div class="h">' + logo +
-    (c.inst ? '<div class="c c1">' + E(c.inst) + '</div>' : '') +
-    '<div class="c c2">' + E(c.school) + '</div>' +
+  const fit = function(l,mn,mx){ return ' fit" data-l="' + l + '" data-min="' + mn + '" data-max="' + mx; };
+
+  return '<div class="fc"><div class="h"><div class="top">' + lgI +
+    '<div class="tx">' + (c.inst ? '<div class="c c1">' + E(c.inst) + '</div>' : '') +
+    '<div class="c c2">' + E(c.school) + '</div></div>' + lgS + '</div>' +
     '<div class="pill">' + E(c.title) + '</div>' +
     '<div class="info">' +
-      '<div>ધોરણ :- ' + E(c.std) + '</div><div class="m">વર્ષ:- ' + E(c.year) + '</div>' +
-      '<div class="p">' + photoBox + '<div class="rl">હાજરી નંબર :- ' + E(c.roll) + '</div>' +
-        ((screen && c.photo) ? '<div class="rm" onclick="removePhoto(' + c.roll + ')">✖ ફોટો કાઢો</div>' : '') + '</div>' +
-      '<div class="w">વિદ્યાર્થીનું નામ:- ' + E(c.name) + '</div>' +
-      '<div>જી.આર.નંબર :- ' + E(c.gr) + '</div><div class="m">જન્મ તારીખ :- ' + E(c.dob) + '</div>' +
-      '<div>કુલ કાર્ય દિવસ :- ' + E(c.days) + '</div><div class="m">હાજર દિવસ :- ' + E(c.att) + '</div>' +
+      '<div class="a">' + lv('ધોરણ :-',c.std) + '</div><div class="a m">' + lv('વર્ષ:-',c.year) + '</div>' +
+      '<div class="p">' + photoBox + '<div class="rl">' + lv('હાજરી નંબર :-',c.roll) + '</div></div>' +
+      '<div class="a w' + fit(1,11,16) + '">' + lv('વિદ્યાર્થીનું નામ:-',c.name) + '</div>' +
+      '<div class="b' + fit(1,9.5,14) + '">' + lv('જી.આર.નંબર :-',c.gr) + '</div><div class="b m' + fit(1,9.5,14) + '">' + lv('જન્મ તારીખ :-',c.dob) + '</div>' +
+      '<div class="b' + fit(1,9.5,14) + '">' + lv('કુલ કાર્ય દિવસ :-',c.days) + '</div><div class="b m' + fit(1,9.5,14) + '">' + lv('હાજર દિવસ :-',c.att) + '</div>' +
     '</div></div>' +
-    '<table class="ft"><colgroup><col style="width:36px"><col style="width:150px"><col style="width:70px"><col style="width:90px"><col style="width:110px"><col style="width:54px"></colgroup>' +
+    '<table class="ft"><colgroup><col style="width:7%"><col style="width:29%"><col style="width:14%"><col style="width:18%"><col style="width:21%"><col style="width:11%"></colgroup>' +
     '<thead><tr><th>ક્રમ</th><th>વિષય</th><th>મેળવેલ ગ્રેડ</th><th>વિષય સંદર્ભે નોંધ</th><th colspan="2">ગ્રેડની સમજ</th></tr></thead><tbody>' +
     rows +
     '<tr class="ov"><td colspan="2">મેળવેલ એકંદરે ગ્રેડ</td><td colspan="4" style="font-size:16px">' + (c.overall || "-") + '</td></tr>' +
     '</tbody></table>' +
-    '<div class="rte"><b>' + FC_RTE_HEAD + '</b><br>' + FC_RTE_BODY + '</div>' +
-    '<div class="sg"><div>વર્ગ શિક્ષકનું નામ :- ' + E(c.teacher) + '</div>' +
-    '<div>વર્ગ શિક્ષકની સહી :-</div>' +
-    '<div style="padding-left:40px">તારીખ :- ' + E(c.date) + '</div>' +
-    '<div class="rt">આચાર્યના સહી અને સિક્કો</div></div>' +
-    '<div class="vac">' + E(c.vac1) + '<br>' + E(c.vac2) + '</div>' +
+    '<div class="rte"><b>' + FC_RTE_HEAD + '</b><div class="t' + fit(2,6,9.5) + '">' + FC_RTE_BODY + '</div></div>' +
+    '<div class="sg"><div>' + lv('વર્ગ શિક્ષકનું નામ :-',c.teacher) + '</div>' +
+    '<div><b>વર્ગ શિક્ષકની સહી :-</b></div>' +
+    '<div>' + lv('તારીખ :-',c.date) + '</div>' +
+    '<div class="rt"><b>આચાર્યની સહી અને સિક્કો</b></div></div>' +
+    '<div class="vac"><div class="t' + fit(1,6,11.5) + '">' + E(c.vac1 + " " + c.vac2) + '</div></div>' +
     '</div>';
 }
 
 function fcPageHTML(from,to){
   let h = '<div class="rpt fpage">';
   for(let i=from;i<to;i++) h += fcCardHTML(i,false);
+  // બે કાર્ડ વચ્ચે કાતરથી કાપવાની નિશાની
+  h += '<div class="cut"><svg width="24" height="24" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3" fill="none" stroke="#000" stroke-width="2"/><circle cx="6" cy="18" r="3" fill="none" stroke="#000" stroke-width="2"/><line x1="8.5" y1="7.5" x2="22" y2="20" stroke="#000" stroke-width="2"/><line x1="8.5" y1="16.5" x2="22" y2="4" stroke="#000" stroke-width="2"/></svg></div>';
   return h + '</div>';
 }
 
@@ -7315,8 +7631,9 @@ async function loadPatrakF(sem){
   }
 
   try{
-    const ps = await photosRef().get();
-    PF.photos = (ps.exists && ps.data().photos) ? ps.data().photos : {};
+    const ps = await photosCol().get();
+    PF.photos = {};
+    ps.forEach(function(dc){ PF.photos[dc.id] = {img:(dc.data().img || "")}; });
   }catch(e){
     PF.photos = {};
   }
@@ -7330,7 +7647,7 @@ function pfRender(){
   const box = document.getElementById("pf-sem"+sem);
 
   box.innerHTML = '<style>' + FC_CSS + '</style>' + `
-    <div class="info-box">બધું પત્રક-C (સેમેસ્ટર-${sem}) માંથી આપોઆપ આવે છે. <b>વર્ગ શિક્ષકનું નામ</b> એક વાર લખવાનું છે અને વિદ્યાર્થીના <b>ફોટા</b> પર દબાવી ફોટો પસંદ કરવાનો છે. PDF, Excel અને પ્રિન્ટ બ્લેક એન્ડ વાઈટ આવશે.</div>
+    <div class="info-box">બધું પત્રક-C (સેમેસ્ટર-${sem}) માંથી આપોઆપ આવે છે. <b>વર્ગ શિક્ષકનું નામ</b> એક વાર લખવાનું છે અને ફોટા <b>વિદ્યાર્થીની માહિતી</b> વાળા પેજ પરથી (વ.પ.નં. મુજબ) આવે છે. PDF, Excel અને પ્રિન્ટ બ્લેક એન્ડ વાઈટ આવશે, બધા વિદ્યાર્થીના.</div>
 
     <div class="form-grid">
       <div class="full">
@@ -7340,8 +7657,6 @@ function pfRender(){
     </div>
     <button class="save-btn" onclick="savePfTeacher(${sem})">💾 વર્ગ શિક્ષકનું નામ સાચવો</button>
     <div id="pf${sem}_status" class="status"></div>
-
-    <input type="file" id="pfPhotoFile" accept="image/*" style="display:none" onchange="onPhotoSelected(event)">
 
     <div id="pf${sem}_cards" style="display:flex;flex-direction:column;gap:14px;align-items:center;margin-top:14px;overflow-x:auto"></div>
 
@@ -7358,6 +7673,7 @@ function pfRender(){
 function pfRenderCards(){
   const el = document.getElementById("pf"+PF.sem+"_cards");
   el.innerHTML = PC.students.map(function(x,i){ return fcCardHTML(i,true); }).join("");
+  el.querySelectorAll(".fit").forEach(fitEl);
 }
 
 function onPfTeacher(sem){
@@ -7382,75 +7698,183 @@ async function savePfTeacher(sem){
   pfRenderCards();
 }
 
-/* ---------- વિદ્યાર્થીનો ફોટો ---------- */
+/* ---------- વિદ્યાર્થીનો ફોટો (વ.પ.નં. મુજબ) : સ્ટેટસ, ફોલ્ડર અપલોડ, 10KB ---------- */
 
-function pickPhoto(sr){
-  PF.pickSr = sr;
-  const f = document.getElementById("pfPhotoFile");
-  if(f) f.click();
+let PHOTO_IDX = {};
+
+/* વ.પ.નં. ને ફાઇલના નામ સાથે મેળવવા માટેની ચાવી */
+function grKey(v){
+  return String(v===undefined || v===null ? "" : v).trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");
 }
 
-async function savePhotos(){
-  const status = document.getElementById("pf"+PF.sem+"_status");
+/* Swift Chat મુજબ નામ સાથે ફાઇલનું નામ મેળવવા માટે */
+function nameKey(v){
+  return String(v||"").trim().toLowerCase().replace(/[_\-.]+/g," ").replace(/\s+/g," ").trim();
+}
+
+function grKeyAlt(k){
+  return /^\d+$/.test(k) ? String(parseInt(k,10)) : k;
+}
+
+function hasPhoto(gr){
+  const k = grKey(gr);
+  if(!k) return false;
+  if(PHOTO_IDX[k]) return true;
+  const alt = grKeyAlt(k);
+  return Object.keys(PHOTO_IDX).some(function(x){ return grKeyAlt(x)===alt; });
+}
+
+function photoStatusHTML(gr){
+  return hasPhoto(gr)
+    ? '<span style="color:#0a7a2f">Complete</span>'
+    : '<span style="color:#c0392b">Pending</span>';
+}
+
+function refreshPhotoCell(inp){
+  const tr = inp.closest("tr");
+  if(!tr) return;
+  const cell = tr.querySelector(".stu-photo");
+  if(cell) cell.innerHTML = photoStatusHTML(inp.value);
+}
+
+function refreshAllPhotoCells(){
+  document.querySelectorAll("#studentTableBody tr").forEach(function(tr){
+    const g = tr.querySelector(".stu-gr");
+    const cell = tr.querySelector(".stu-photo");
+    if(g && cell) cell.innerHTML = photoStatusHTML(g.value);
+  });
+}
+
+async function loadPhotoIndex(){
+  PHOTO_IDX = {};
+  if(!currentUser || !selectedStandard || !selectedDivision) return;
   try{
-    showLoading(true);
-    await photosRef().set({photos:PF.photos, updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
-    if(status){
-      status.style.color = "green";
-      status.innerText = "ફોટો સચવાઈ ગયો.";
-    }
+    const sn = await photoIndexRef().get();
+    if(sn.exists && sn.data().grs) PHOTO_IDX = sn.data().grs;
   }catch(e){
-    if(status){
-      status.style.color = "red";
-      status.innerText = firebaseError(e);
-    }
-  }finally{
-    showLoading(false);
+    console.log("photo index",e);
   }
 }
 
-function onPhotoSelected(ev){
-  const f = ev.target.files[0];
-  const sr = PF.pickSr;
-  ev.target.value = "";
-  if(!f || !sr) return;
-  if(!/^image\//.test(f.type)){
-    alert("ફક્ત ફોટો પસંદ કરો.");
+/* ફોટાને આશરે 10KB (base64 ≈ 13,000 અક્ષર) સુધી નાનો કરે */
+function compressPhoto(img,maxChars){
+  let W = 112, H = 130;
+  let last = "";
+  for(let attempt=0;attempt<5;attempt++){
+    const cv = document.createElement("canvas");
+    cv.width = W;
+    cv.height = H;
+    const cx = cv.getContext("2d");
+    const k = Math.max(W/img.width, H/img.height);
+    const w = img.width*k;
+    const h = img.height*k;
+    cx.fillStyle = "#fff";
+    cx.fillRect(0,0,W,H);
+    cx.drawImage(img,(W-w)/2,(H-h)/2,w,h);
+    for(let q=0.75;q>=0.3;q-=0.1){
+      last = cv.toDataURL("image/jpeg",q);
+      if(last.length<=maxChars) return last;
+    }
+    W = Math.round(W*0.85);
+    H = Math.round(H*0.85);
+  }
+  return last;
+}
+
+function loadImageFile(file){
+  return new Promise(function(resolve,reject){
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = function(){ URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error("ફોટો ખૂલ્યો નથી")); };
+    img.src = url;
+  });
+}
+
+async function onPhotoFiles(ev){
+  const input = ev.target;
+  const files = Array.from(input.files || []).filter(function(f){ return /^image\//.test(f.type) || /\.(jpe?g|png|webp|bmp|gif)$/i.test(f.name); });
+  input.value = "";
+  const status = document.getElementById("photoUploadStatus");
+
+  if(!currentUser){ alert("Login જરૂરી છે."); return; }
+  if(!selectedStandard || !selectedDivision){
+    alert("પહેલા મુખ્ય પેજ પરથી ધોરણ અને વર્ગ પસંદ કરો.");
+    return;
+  }
+  if(files.length===0){
+    status.style.color = "red";
+    status.innerText = "કોઈ ફોટો મળ્યો નથી.";
     return;
   }
 
-  const stu = PC.students.find(function(x){ return x.sr===sr; });
-  if(!stu) return;
+  // વિદ્યાર્થીની યાદી (વ.પ.નં. પ્રમાણે)
+  const byKey = {};
+  const byAlt = {};
+  const byName = {};
+  document.querySelectorAll("#studentTableBody tr").forEach(function(tr){
+    const k = grKey(tr.querySelector(".stu-gr").value);
+    if(k){
+      byKey[k] = true;
+      byAlt[grKeyAlt(k)] = k;
+      const sw = nameKey(tr.querySelector(".stu-swift").value);
+      if(sw) byName[sw] = k;
+    }
+  });
+  if(Object.keys(byKey).length===0){
+    status.style.color = "red";
+    status.innerText = "પહેલા વિદ્યાર્થીની યાદીમાં વ.પ.નં. લખીને સાચવો, પછી ફોટા અપલોડ કરો.";
+    return;
+  }
 
-  const rd = new FileReader();
-  rd.onload = function(e){
-    const img = new Image();
-    img.onload = function(){
-      // 96x112 ના પ્રમાણમાં (cover) કાપીને નાનો કરવો
-      const W = 144, H = 168;
-      const cv = document.createElement("canvas");
-      cv.width = W;
-      cv.height = H;
-      const cx = cv.getContext("2d");
-      const k = Math.max(W/img.width, H/img.height);
-      const w = img.width*k, h = img.height*k;
-      cx.fillStyle = "#fff";
-      cx.fillRect(0,0,W,H);
-      cx.drawImage(img,(W-w)/2,(H-h)/2,w,h);
-      PF.photos[sr] = {name:stu.name, img:cv.toDataURL("image/jpeg",0.78)};
-      pfRenderCards();
-      savePhotos();
-    };
-    img.onerror = function(){ alert("ફોટો ખૂલી શક્યો નથી."); };
-    img.src = e.target.result;
-  };
-  rd.readAsDataURL(f);
-}
+  const ready = [];
+  const unmatched = [];
+  const MAXC = 13000;
 
-function removePhoto(sr){
-  delete PF.photos[sr];
-  pfRenderCards();
-  savePhotos();
+  try{
+    showLoading(true);
+    for(let i=0;i<files.length;i++){
+      const f = files[i];
+      setLoadingText("ફોટા તૈયાર થાય છે: " + (i+1) + " / " + files.length);
+      const base = f.name.replace(/\.[^.]+$/,"");
+      let key = grKey(base);
+      if(!byKey[key]) key = byAlt[grKeyAlt(key)] || "";
+      if(!key) key = byName[nameKey(base)] || "";
+      if(!key){ unmatched.push(f.name); continue; }
+      try{
+        const img = await loadImageFile(f);
+        ready.push({key:key, img:compressPhoto(img,MAXC)});
+      }catch(e){
+        unmatched.push(f.name);
+      }
+    }
+
+    // સેવ (25-25 ના જૂથમાં)
+    for(let i=0;i<ready.length;i+=25){
+      setLoadingText("ફોટા સેવ થાય છે: " + Math.min(i+25,ready.length) + " / " + ready.length);
+      const batch = db.batch();
+      const grs = {};
+      ready.slice(i,i+25).forEach(function(x){
+        batch.set(photosCol().doc(x.key),{img:x.img, updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+        grs[x.key] = true;
+      });
+      batch.set(photoIndexRef(),{grs:grs},{merge:true});
+      await batch.commit();
+      Object.keys(grs).forEach(function(k){ PHOTO_IDX[k] = true; });
+    }
+
+    refreshAllPhotoCells();
+    status.style.color = ready.length ? "green" : "red";
+    status.innerText = ready.length + " ફોટા અપલોડ થયા." +
+      (unmatched.length ? " " + unmatched.length + " ફોટા વ.પ.નં. સાથે મેળ ખાતા નથી: " + unmatched.slice(0,5).join(", ") + (unmatched.length>5 ? " ..." : "") : "");
+  }catch(e){
+    console.error(e);
+    status.style.color = "red";
+    status.innerText = firebaseError(e);
+  }finally{
+    setLoadingText("");
+    showLoading(false);
+  }
 }
 
 function pfExport(sem,action){
@@ -7476,7 +7900,7 @@ async function exportPatrakFExcel(d){
     const ws = wb.addWorksheet("પત્રક-F");
     const bl = {style:"thin",color:{argb:"FF000000"}};
     const border = {top:bl,left:bl,bottom:bl,right:bl};
-    const thick = {style:"medium",color:{argb:"FF000000"}};
+    const med = {style:"medium",color:{argb:"FF000000"}};
     const widths = [5,20,11,13,16,12];
 
     widths.forEach(function(w,k){
@@ -7484,6 +7908,14 @@ async function exportPatrakFExcel(d){
       ws.getColumn(8+k).width = w;
     });
     ws.getColumn(7).width = 3;
+
+    // નામ/લેબલ bold, પાછળનું લખાણ normal
+    const rich = function(label,value,size){
+      return {richText:[
+        {text:label + " ",font:{bold:true,size:size||11}},
+        {text:String(value===undefined || value===null ? "" : value),font:{size:size||11}}
+      ]};
+    };
 
     function put(r,L,c1,c2,text,st){
       st = st || {};
@@ -7493,7 +7925,7 @@ async function exportPatrakFExcel(d){
       cell.value = text;
       cell.font = {bold:!!st.bold,size:st.size||11,color:{argb:st.color||"FF000000"}};
       if(st.fill) cell.fill = {type:"pattern",pattern:"solid",fgColor:{argb:st.fill}};
-      cell.alignment = {horizontal:st.align||"center",vertical:"middle",wrapText:!!st.wrap};
+      cell.alignment = {horizontal:st.align||"center",vertical:"middle",wrapText:!!st.wrap,shrinkToFit:!!st.shrink};
       cell.border = st.border || border;
     }
 
@@ -7511,18 +7943,20 @@ async function exportPatrakFExcel(d){
       const L0 = {align:"left"};
       put(top,L,1,6,c.inst,{bold:true,size:12});
       put(top+1,L,1,6,c.school,{bold:true,size:14});
-      put(top+2,L,1,6,c.title,{bold:true,size:12,border:{top:thick,left:thick,bottom:thick,right:thick}});
-      put(top+3,L,1,2,"ધોરણ :- " + c.std,L0);
-      put(top+3,L,3,4,"વર્ષ:- " + c.year,{});
-      ws.mergeCells(top+3,L+4,top+6,L+5);
-      ws.getCell(top+3,L+4).border = border;
-      put(top+4,L,1,4,"વિદ્યાર્થીનું નામ:- " + c.name,L0);
-      put(top+5,L,1,2,"જી.આર.નંબર :- " + c.gr,L0);
-      put(top+5,L,3,4,"જન્મ તારીખ :- " + c.dob,{});
-      put(top+6,L,1,2,"કુલ કાર્ય દિવસ :- " + c.days,L0);
-      put(top+6,L,3,4,"હાજર દિવસ :- " + c.att,{});
+      put(top+2,L,1,6,c.title,{bold:true,size:11,border:{top:med,left:med,bottom:med,right:med}});
+      put(top+3,L,1,2,rich("ધોરણ :-",c.std,13),L0);
+      put(top+3,L,3,4,rich("વર્ષ:-",c.year,13),{});
+      if(c.photo){
+        ws.mergeCells(top+3,L+4,top+6,L+5);
+        ws.getCell(top+3,L+4).border = border;
+      }
+      put(top+4,L,1,4,rich("વિદ્યાર્થીનું નામ:-",c.name,13),{align:"left",shrink:true});
+      put(top+5,L,1,2,rich("જી.આર.નંબર :-",c.gr),L0);
+      put(top+5,L,3,4,rich("જન્મ તારીખ :-",c.dob),{shrink:true});
+      put(top+6,L,1,2,rich("કુલ કાર્ય દિવસ :-",c.days),L0);
+      put(top+6,L,3,4,rich("હાજર દિવસ :-",c.att),{shrink:true});
       put(top+7,L,1,4,"",{});
-      put(top+7,L,5,6,"હાજરી નંબર :- " + c.roll,{bold:true});
+      put(top+7,L,5,6,rich("હાજરી નંબર :-",c.roll),{});
 
       const H = {bold:true,size:10,wrap:true,fill:"FF000000",color:"FFFFFFFF"};
       put(top+8,L,1,1,"ક્રમ",H);
@@ -7535,30 +7969,38 @@ async function exportPatrakFExcel(d){
         const rr = top + 9 + k;
         put(rr,L,1,1,k+1,{});
         put(rr,L,2,2,r.name,L0);
-        put(rr,L,3,3,r.grade || "-",{bold:true});
+        put(rr,L,3,3,r.grade || "-",{});
         put(rr,L,4,4,"-",{});
         if(k<5){
           put(rr,L,5,5,FC_SCALE[k][0],{});
-          put(rr,L,6,6,FC_SCALE[k][1],{bold:true});
+          put(rr,L,6,6,FC_SCALE[k][1],{});
         }
       });
       ws.mergeCells(top+14,L+4,top+16,L+5);
       ws.getCell(top+14,L+4).border = border;
 
-      put(top+17,L,1,2,"મેળવેલ એકંદરે ગ્રેડ",{bold:true,border:{top:{style:"double",color:{argb:"FF000000"}},left:bl,bottom:bl,right:bl}});
-      put(top+17,L,3,6,c.overall || "-",{bold:true,size:13,border:{top:{style:"double",color:{argb:"FF000000"}},left:bl,bottom:bl,right:bl}});
+      const dbl = {top:{style:"double",color:{argb:"FF000000"}},left:bl,bottom:bl,right:bl};
+      put(top+17,L,1,2,"મેળવેલ એકંદરે ગ્રેડ",{bold:true,border:dbl});
+      put(top+17,L,3,6,c.overall || "-",{bold:true,size:13,border:dbl});
 
-      put(top+18,L,1,6,FC_RTE_HEAD + "\n" + FC_RTE_BODY,{size:8,wrap:true});
-      put(top+19,L,1,6,"વર્ગ શિક્ષકનું નામ :- " + c.teacher,L0);
-      put(top+20,L,1,6,"વર્ગ શિક્ષકની સહી :-",L0);
-      put(top+21,L,1,6,"તારીખ :- " + c.date,{});
-      put(top+22,L,1,6,"આચાર્યના સહી અને સિક્કો",{align:"right"});
-      put(top+23,L,1,6,c.vac1,{bold:true,size:10});
-      put(top+24,L,1,6,c.vac2,{bold:true,size:10});
+      put(top+18,L,1,6,{richText:[
+        {text:FC_RTE_HEAD + "\n",font:{bold:true,size:8}},
+        {text:FC_RTE_BODY,font:{size:6.5}}
+      ]},{wrap:true});
+      put(top+19,L,1,6,rich("વર્ગ શિક્ષકનું નામ :-",c.teacher),L0);
+      put(top+20,L,1,6,"વર્ગ શિક્ષકની સહી :-",{align:"left",bold:true});
+      put(top+21,L,1,6,rich("તારીખ :-",c.date),L0);
+      put(top+22,L,1,6,"આચાર્યની સહી અને સિક્કો",{align:"right",bold:true});
+      put(top+23,L,1,6,c.vac1 + " " + c.vac2,{bold:true,size:9,shrink:true});
 
-      // લોગો (ડાબી બાજુ ઉપર) અને ફોટો (હાજરી નંબર પાસે)
-      if(schoolExtra.logo) addImg(schoolExtra.logo,L-1+0.1,top-1+0.1,50,50);
-      if(c.photo) addImg(c.photo,L-1+4+0.2,top-1+3+0.1,92,106);
+      // લોગો: ડાબે સંસ્થાનો, જમણે શાળાનો (હેડરના લખાણની નજીક)
+      const x0 = xlPx(ws,1,L-1);
+      const wd = xlPx(ws,L,L+5);
+      const tw = Math.min(wd*0.8, Math.max((c.inst||"").length,(c.school||"").length)*14);
+      if(schoolExtra.instLogo) addImg(schoolExtra.instLogo,xlColAt(ws,13,Math.max(2,x0 + (wd-tw)/2 - 60)),top-1+0.1,46,46);
+      if(schoolExtra.logo) addImg(schoolExtra.logo,xlColAt(ws,13,x0 + (wd+tw)/2 + 8),top-1+0.1,46,46);
+      // વિદ્યાર્થીનો ફોટો
+      if(c.photo) addImg(c.photo,xlColAt(ws,13,x0 + xlPx(ws,L,L+3) + 12),top-1+3+0.1,92,106);
     }
 
     const list = PC.students;
@@ -7567,16 +8009,23 @@ async function exportPatrakFExcel(d){
       card(top,1,fcData(i));
       if(i+1<list.length) card(top,8,fcData(i+1));
 
-      for(let r=top;r<top+25;r++) ws.getRow(r).height = 20;
+      // કાતરથી કાપવાની નિશાની (બે કાર્ડ વચ્ચે)
+      for(let r=top;r<top+24;r++){
+        ws.getCell(r,7).border = {left:{style:"dashed",color:{argb:"FF000000"}}};
+      }
+      ws.getCell(top+8,7).value = "✂";
+      ws.getCell(top+8,7).alignment = {horizontal:"center",vertical:"middle"};
+
+      for(let r=top;r<top+24;r++) ws.getRow(r).height = 20;
       ws.getRow(top).height = 30;
       ws.getRow(top+1).height = 24;
-      ws.getRow(top+2).height = 26;
+      ws.getRow(top+2).height = 24;
       for(let r=top+3;r<=top+6;r++) ws.getRow(r).height = 28;
-      ws.getRow(top+18).height = 70;
+      ws.getRow(top+18).height = 34;
 
-      const sp = ws.getRow(top+25);
+      const sp = ws.getRow(top+24);
       if(typeof sp.addPageBreak==="function") sp.addPageBreak();
-      top += 26;
+      top += 25;
     }
 
     ws.pageSetup = {
@@ -7586,7 +8035,7 @@ async function exportPatrakFExcel(d){
       fitToWidth:1,
       fitToHeight:0,
       horizontalCentered:true,
-      margins:{left:0.3,right:0.3,top:0.4,bottom:0.4,header:0.2,footer:0.2}
+      margins:{left:0.15,right:0.15,top:0.15,bottom:0.15,header:0.1,footer:0.1}
     };
 
     await xlDownload(wb,d);
@@ -7595,6 +8044,289 @@ async function exportPatrakFExcel(d){
     alert("Excel Exportમાં સમસ્યા:\n" + e.message);
   }
 }
+
+/* =========================================================
+   FRONT PAGE (પરિશિષ્ટ - C) - સેમેસ્ટર-1 અને સેમેસ્ટર-2
+   બધી માહિતી પત્રક-C માંથી આપોઆપ | PDF/Print/Excel બ્લેક એન્ડ વાઈટ
+========================================================= */
+
+const FP_CATS = [["SC","અનુ. જાતિ"],["ST","અનુ. જ. જાતિ"],["OBC","બક્ષી પંચ"],["GEN","અન્ય"]];
+const FP_GR = ["A","B","C","D","E"];
+const FP_RANK = ["પ્રથમ","દ્વિતિય","તૃતિય"];
+
+function fpData(){
+  const sem = PC.sem;
+  const e = schoolExtra;
+  const reg = {};
+  const gc = {};
+  FP_CATS.forEach(function(c){
+    reg[c[0]] = {b:0,g:0,t:0};
+    gc[c[0]] = {};
+    FP_GR.forEach(function(g){ gc[c[0]][g] = {b:0,g:0,t:0}; });
+  });
+
+  PC.students.forEach(function(s,i){
+    const st = students[i] || {};
+    const cat = reg[st.category] ? st.category : "GEN";
+    const bump = function(o){
+      o.t++;
+      if(st.gender==="BOY") o.b++;
+      else if(st.gender==="GIRL") o.g++;
+    };
+    bump(reg[cat]);
+    if(s.grade && gc[cat][s.grade]) bump(gc[cat][s.grade]);
+  });
+
+  const rows = FP_CATS.map(function(c){
+    const r = [c[1], reg[c[0]].b, reg[c[0]].g, reg[c[0]].t];
+    FP_GR.forEach(function(g){
+      const o = gc[c[0]][g];
+      r.push(o.b,o.g,o.t);
+    });
+    return r;
+  });
+  const tot = ["કુલ"];
+  for(let k=1;k<19;k++) tot.push(rows.reduce(function(a,r){ return a + r[k]; },0));
+  rows.push(tot);
+
+  const top = [];
+  for(let rk=1;rk<=3;rk++){
+    const list = PC.students.filter(function(s){ return s.hasAny && s.rank===rk; });
+    if(list.length===0){
+      top.push({label:FP_RANK[rk-1], sr:"", name:"", max:"", total:"", grade:"", pct:""});
+    }else{
+      list.forEach(function(s){
+        top.push({
+          label:FP_RANK[rk-1], sr:s.sr, name:s.name, max:PC.maxTotal, total:s.total, grade:s.grade,
+          pct:(s.percent!=="" ? Number(s.percent).toFixed(2) + "%" : "")
+        });
+      });
+    }
+  }
+
+  return {
+    sem:sem,
+    std: selectedStandard + "-" + selectedDivision,
+    year: document.getElementById("academicYear").value,
+    inst: e.institution || "",
+    school: document.getElementById("schoolName").value.trim(),
+    address: document.getElementById("schoolAddress").value.trim(),
+    title: sem===2 ? "વાર્ષિક પરિણામ પત્રક" : "સત્રાંત પરિણામ પત્રક",
+    teacher: PF.teacher || "",
+    date: fmtDate(sem===2 ? e.sem2ResultDate : e.sem1ResultDate),
+    rows:rows, top:top
+  };
+}
+
+function fpPageHTML(){
+  const D = fpData();
+  const E = function(x){ return escapeHtml(String(x===undefined || x===null ? "" : x)); };
+  const lgI = schoolExtra.instLogo ? grayOf(schoolExtra.instLogo) : "";
+  const lgS = schoolExtra.logo ? grayOf(schoolExtra.logo) : "";
+
+  let h = '<div class="rpt fp">' +
+    '<div class="fno">' + E(D.std) + '</div>' +
+    '<div class="bar b0">પરિશિષ્ટ - C</div>' +
+    (D.inst ? '<div class="bar b1">' + E(D.inst) + '</div>' : '') +
+    '<div class="bar b2">' + E(D.school) + (D.address ? '<small>' + E(D.address) + '</small>' : '') + '</div>' +
+    '<div class="ttl">' + E(D.title) + ' : <u>' + E(D.year) + '</u></div>' +
+    ((lgI || lgS) ? '<div class="lgbox">' + (lgI ? '<img src="' + lgI + '">' : '') + (lgS ? '<img src="' + lgS + '">' : '') + '</div>' : '') +
+    '<table class="fi" style="width:440px"><colgroup><col style="width:200px"><col style="width:240px"></colgroup>' +
+    '<tr><td>વર્ગ શિક્ષકનું નામ :</td><td>' + E(D.teacher) + '</td></tr>' +
+    '<tr><td>ધોરણ :</td><td>' + E(D.std) + '</td></tr>' +
+    '<tr><td>પરિણામ તારીખ :</td><td>' + E(D.date) + '</td></tr></table>';
+
+  // જાતિ મુજબ રજી. સંખ્યા અને ગ્રેડ
+  h += '<table class="fc2" style="width:700px"><colgroup><col style="width:112px">';
+  for(let i=0;i<18;i++) h += '<col style="width:28px">';
+  h += '<col style="width:84px"></colgroup><thead>';
+  h += '<tr><th rowspan="3">જાતિ</th><th colspan="3" rowspan="2">રજી. સંખ્યા</th><th colspan="15">મેળવેલ એકંદરે ગ્રેડ</th><th rowspan="3">નોંધ</th></tr>';
+  h += '<tr>';
+  FP_GR.forEach(function(g){ h += '<th colspan="3">' + g + '</th>'; });
+  h += '</tr><tr>';
+  for(let i=0;i<6;i++){
+    ["કુમાર","કન્યા","કુલ"].forEach(function(t){ h += '<th>' + rotTh(t,26,52,"#000000",true) + '</th>'; });
+  }
+  h += '</tr></thead><tbody>';
+  D.rows.forEach(function(r,ri){
+    const last = ri===D.rows.length-1;
+    h += '<tr>';
+    r.forEach(function(v,k){ h += '<td class="' + (k===0 ? 'l b' : (last ? 'b' : '')) + '">' + E(v) + '</td>'; });
+    h += '<td></td></tr>';
+  });
+  h += '</tbody></table>';
+
+  // પ્રથમ / દ્વિતિય / તૃતિય
+  h += '<table class="f3" style="width:700px"><colgroup><col style="width:60px"><col style="width:250px"><col style="width:70px"><col style="width:70px"><col style="width:55px"><col style="width:85px"><col style="width:110px"></colgroup>' +
+    '<thead><tr><th>હા. નં.</th><th>વિદ્યાર્થીનું નામ</th><th>કુલ ગુણ</th><th>મેળ.ગુણ</th><th>ગ્રેડ</th><th>ટકા</th><th>ક્રમાંક</th></tr></thead><tbody>';
+  D.top.forEach(function(t){
+    h += '<tr><td>' + E(t.sr) + '</td><td class="l">' + E(t.name) + '</td><td>' + E(t.max) + '</td><td>' + E(t.total) +
+         '</td><td>' + E(t.grade) + '</td><td>' + E(t.pct) + '</td><td class="b">' + E(t.label) + '</td></tr>';
+  });
+  h += '</tbody></table>';
+
+  h += '<div class="sgn"><span>વર્ગશિક્ષકની સહી</span><span>આચાર્યની સહી</span></div></div>';
+  return h;
+}
+
+async function loadFrontPage(sem){
+  const box = document.getElementById("fp-sem"+sem);
+  const msg = await pcFetch(sem);
+  if(msg){
+    box.innerHTML = '<div class="info-box">' + escapeHtml(msg) + '</div>';
+    return;
+  }
+  try{
+    const sn = await metaRef().get();
+    PF.teacher = sn.exists ? (sn.data().teacher || "") : "";
+  }catch(e){
+    PF.teacher = "";
+  }
+
+  box.innerHTML = '<style>' + FC_CSS + FP_CSS + '</style>' + `
+    <div class="info-box">બધી માહિતી પત્રક-C (સેમેસ્ટર-${sem}) માંથી આપોઆપ આવે છે. વર્ગ શિક્ષકનું નામ પત્રક-F ના પેજ પર લખીને સાચવ્યું હોય તે અહીં આવશે. PDF, Excel અને પ્રિન્ટ બ્લેક એન્ડ વાઈટ આવશે.</div>
+    <div style="overflow-x:auto"><div id="fp${sem}_page">${fpPageHTML()}</div></div>
+    <button class="save-btn" style="background:#147a35" onclick="loadFrontPage(${sem})">🔄 ફરી લોડ કરો</button>
+    <div class="export-bar">
+      <button class="action-btn pdf" onclick="fpExport(${sem},'pdf')">📄 PDF સેવ</button>
+      <button class="action-btn excel" onclick="fpExport(${sem},'excel')">📊 Excel Export</button>
+      <button class="action-btn print" onclick="fpExport(${sem},'print')">🖨️ પ્રિન્ટ</button>
+    </div>
+  `;
+}
+
+function fpExport(sem,action){
+  if(!PC || PC.sem!==sem){
+    alert("પહેલા ડેટા લોડ થવા દો. ('ફરી લોડ કરો' દબાવો)");
+    return;
+  }
+  const d = {
+    school:"", info:"", title:"Front Page", fileTitle:"સેમેસ્ટર-" + sem + "_Front_Page",
+    landscape:false, headers:[], rows:[], fpage:true, popupAt:1000000, defPer:30
+  };
+  if(action==="pdf") saveReportPdf(d);
+  else if(action==="excel") exportReportExcel(d);
+  else printReport(d);
+}
+
+async function exportFrontPageExcel(d){
+  try{
+    const D = fpData();
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Front Page");
+    const bl = {style:"thin",color:{argb:"FF000000"}};
+    const border = {top:bl,left:bl,bottom:bl,right:bl};
+    const med = {style:"medium",color:{argb:"FF000000"}};
+    const thick = {top:med,left:med,bottom:med,right:med};
+    const N = 20;
+
+    ws.getColumn(1).width = 16;
+    for(let c=2;c<=19;c++) ws.getColumn(c).width = 5.2;
+    ws.getColumn(20).width = 14;
+
+    function put(r,c1,c2,text,st){
+      st = st || {};
+      if(c2>c1) ws.mergeCells(r,c1,r,c2);
+      const cell = ws.getCell(r,c1);
+      cell.value = text;
+      cell.font = {bold:st.bold!==false,size:st.size||11,color:{argb:st.black ? "FFFFFFFF" : "FF000000"}};
+      if(st.black) cell.fill = {type:"pattern",pattern:"solid",fgColor:{argb:"FF000000"}};
+      cell.alignment = {horizontal:st.align||"center",vertical:"middle",wrapText:!!st.wrap,textRotation:st.rot ? 90 : 0};
+      cell.border = st.border || border;
+    }
+
+    let r = 1;
+    put(r,1,N,D.std,{align:"right",size:12,border:{}}); ws.getRow(r).height = 20; r++;
+    put(r,1,N,"પરિશિષ્ટ - C",{black:true,size:20}); ws.getRow(r).height = 32; r++;
+    if(D.inst){ put(r,1,N,D.inst,{size:16,border:thick}); ws.getRow(r).height = 30; r++; }
+    put(r,1,N,D.school,{size:16,border:thick}); ws.getRow(r).height = 28; r++;
+    if(D.address){ put(r,1,N,D.address,{size:12,border:thick}); ws.getRow(r).height = 22; r++; }
+    put(r,1,N,D.title + " : " + D.year,{size:16,border:thick}); ws.getRow(r).height = 30; r++;
+
+    // લોગો (ડાબે સંસ્થાનો, જમણે શાળાનો)
+    const logoTop = r;
+    for(let k=0;k<4;k++){ ws.getRow(r).height = 28; r++; }
+    const totW = xlPx(ws,1,N);
+    xlPlaceImg(ws,wb,N,schoolExtra.instLogo,totW/2 - 30 - 100,logoTop-1+0.1,100);
+    xlPlaceImg(ws,wb,N,schoolExtra.logo,totW/2 + 30,logoTop-1+0.1,100);
+
+    // વર્ગ શિક્ષક / ધોરણ / પરિણામ તારીખ
+    [["વર્ગ શિક્ષકનું નામ :",D.teacher],["ધોરણ :",D.std],["પરિણામ તારીખ :",D.date]].forEach(function(x){
+      put(r,5,9,x[0],{align:"left",size:12});
+      put(r,10,16,x[1],{align:"left",size:12});
+      ws.getRow(r).height = 22;
+      r++;
+    });
+    r++;
+
+    // જાતિ મુજબ કોષ્ટક
+    const h1 = r;
+    put(h1,1,1,"જાતિ",{}); ws.mergeCells(h1,1,h1+2,1);
+    put(h1,2,2,"રજી. સંખ્યા",{}); ws.mergeCells(h1,2,h1+1,4);
+    put(h1,5,19,"મેળવેલ એકંદરે ગ્રેડ",{});
+    put(h1,20,20,"નોંધ",{}); ws.mergeCells(h1,20,h1+2,20);
+    FP_GR.forEach(function(g,i){ put(h1+1,5+i*3,7+i*3,g,{}); });
+    for(let c=2;c<=19;c++){
+      put(h1+2,c,c,["કુમાર","કન્યા","કુલ"][(c-2)%3],{rot:true,size:10});
+    }
+    ws.getRow(h1+2).height = 56;
+    r = h1 + 3;
+    D.rows.forEach(function(row,ri){
+      row.forEach(function(v,k){
+        put(r,k+1,k+1,v,{bold:(k===0 || ri===D.rows.length-1),align:k===0 ? "left" : "center"});
+      });
+      put(r,20,20,"",{});
+      ws.getRow(r).height = 24;
+      r++;
+    });
+    r++;
+
+    // પ્રથમ / દ્વિતિય / તૃતિય
+    const t1 = r;
+    put(t1,1,1,"હા. નં.",{});
+    put(t1,2,9,"વિદ્યાર્થીનું નામ",{});
+    put(t1,10,11,"કુલ ગુણ",{});
+    put(t1,12,13,"મેળ.ગુણ",{});
+    put(t1,14,15,"ગ્રેડ",{});
+    put(t1,16,17,"ટકા",{});
+    put(t1,18,20,"ક્રમાંક",{});
+    r++;
+    D.top.forEach(function(t){
+      put(r,1,1,t.sr,{bold:false});
+      put(r,2,9,t.name,{bold:false,align:"left"});
+      put(r,10,11,t.max,{bold:false});
+      put(r,12,13,t.total,{bold:false});
+      put(r,14,15,t.grade,{bold:false});
+      put(r,16,17,t.pct,{bold:false});
+      put(r,18,20,t.label,{});
+      ws.getRow(r).height = 24;
+      r++;
+    });
+
+    r += 2;
+    put(r,1,8,"વર્ગશિક્ષકની સહી",{size:13,border:{}});
+    put(r,13,20,"આચાર્યની સહી",{size:13,border:{}});
+    ws.getRow(r).height = 30;
+
+    ws.pageSetup = {
+      paperSize:9,
+      orientation:"portrait",
+      fitToPage:true,
+      fitToWidth:1,
+      fitToHeight:1,
+      horizontalCentered:true,
+      margins:{left:0.4,right:0.4,top:0.4,bottom:0.4,header:0.2,footer:0.2}
+    };
+
+    await xlDownload(wb,d);
+  }catch(e){
+    console.error(e);
+    alert("Excel Exportમાં સમસ્યા:\n" + e.message);
+  }
+}
+
+
+loadRemember();
 
 </script>
 
